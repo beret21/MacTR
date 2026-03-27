@@ -1,0 +1,123 @@
+# MacTR
+
+[English](README.md)
+
+**Mac + Thermalright** — Thermalright Trofeo Vision 9.16 LCD 디스플레이를 위한 네이티브 macOS 메뉴바 앱.
+
+Thermalright CPU 쿨러의 1920x480 LCD를 macOS에서 실시간 시스템 모니터링 대시보드로 활용합니다. Windows 없이 사용 가능.
+
+![시스템 모니터 대시보드](img/monitor-final.png)
+
+## 주요 기능
+
+- **5패널 대시보드**: CPU, GPU, Memory, Disk, System
+- **Airflow 온도** — IOHIDEventSystemClient 사용 (sudo 불필요)
+- **네트워크 트래픽** — 다운로드/업로드 미러 바 차트
+- **디스크 I/O** — 읽기/쓰기 미러 바 차트
+- **USB 핫플러그** — 연결/해제 자동 감지, 잠자기 복구
+- **메뉴바 앱** — 백그라운드 실행, Dock 아이콘 없음
+- **연결 상태 배지** — LCD 미연결 시 빨간색 표시
+- **소프트웨어 밝기** — 10단계 조절
+- **적응형 레이아웃** — 8~24+ 코어 지원 (M1~M5)
+
+## 하드웨어
+
+|  |  |
+|---|---|
+| **제품** | [Thermalright Trofeo Vision 9.16 LCD](https://www.thermalright.com/product/trofeo-vision-9-16-lcd-black/) ([White](https://www.thermalright.com/product/trofeo-vision-9-16-lcd-white/)) |
+| **디스플레이** | 9.16" IPS, 1920 x 480 |
+| **연결** | USB Type-C (USB 2.0) |
+| **Windows 소프트웨어** | [TRCC (공식)](https://www.thermalright.com/support/download/) |
+
+## 요구 사항
+
+- macOS 26 (Tahoe) — 개발 및 테스트 완료
+- macOS 15 (Sequoia) — 호환 가능성 높음 (미테스트)
+- macOS 14 (Sonoma) — 소수 수정으로 가능할 수 있음 (미테스트)
+- Apple Silicon (M1/M2/M3/M4/M5)
+- [Homebrew](https://brew.sh)
+- Thermalright LCD 쿨러 (Trofeo Vision 9.16 또는 호환 제품)
+- USB-C 직접 연결
+
+## 설치
+
+### 다운로드 (권장)
+
+1. [Releases](https://github.com/beret21/MacTR/releases)에서 `MacTR.dmg` 다운로드
+2. DMG를 열고 `MacTR.app`을 Applications로 드래그
+3. 첫 실행: **우클릭 → 열기** (서명되지 않은 앱이므로 최초 1회 필요)
+
+### 소스에서 빌드
+
+```bash
+brew install libusb pkg-config
+
+git clone https://github.com/beret21/MacTR.git
+cd MacTR
+swift build -c release
+
+.build/release/MacTR
+```
+
+## 사용법
+
+### GUI 모드 (기본)
+
+```bash
+./MacTR
+```
+
+메뉴바 앱으로 실행됩니다. 디스플레이 아이콘을 클릭하면 연결 상태 확인, 설정, 종료가 가능합니다.
+
+### CLI 모드
+
+```bash
+./MacTR --cli                    # LCD에 시스템 모니터 표시
+./MacTR --cli --test             # USB 연결 테스트
+./MacTR --cli -b 7              # 밝기 7단계
+```
+
+### 스냅샷 모드 (개발용)
+
+```bash
+./MacTR --snapshot output.png            # 한 프레임을 PNG로 저장
+./MacTR --snapshot output.png --cores 24 # 24코어 레이아웃 시뮬레이션
+```
+
+## 대시보드 패널
+
+| 패널 | 표시 항목 |
+|------|----------|
+| **CPU** | 사용률 아크 게이지, 코어별 바 차트, airflow 온도, Load average (1/5/15분) |
+| **GPU** | Device/Renderer/Tiler 활용률, VRAM 사용량 |
+| **Memory** | Active/Wired/Compressed/Available 분류, Swap, 네트워크 트래픽 차트 |
+| **Disk** | APFS 컨테이너 사용량, 읽기/쓰기 I/O 차트 |
+| **System** | 시계, 날짜, 가동 시간, 프로세스 수, Load average, 배터리 |
+
+## 지원 디바이스
+
+| 디바이스 | VID:PID | 프로토콜 | 상태 |
+|---------|---------|---------|------|
+| Trofeo Vision 9.16 | `0416:5408` | LY Bulk | 테스트 완료 |
+| LY1 변형 | `0416:5409` | LY1 Bulk | 지원 (미테스트) |
+
+## 프로토콜
+
+USB 통신은 [thermalright-trcc-linux](https://github.com/Lexonight1/thermalright-trcc-linux) 프로젝트에서 리버스 엔지니어링된 LY Bulk 프로토콜을 기반으로 합니다.
+
+1. **핸드셰이크**: 2048바이트 초기화 → 512바이트 응답 → PM/SUB/FBL 추출
+2. **프레임 전송**: JPEG 1920x480, 180° 회전, 512바이트 청크로 분할
+3. **화면 유지**: 0.5초 간격으로 프레임 반복 전송 (중단 시 수 초 내 화면 꺼짐)
+
+## 감사의 글
+
+- [thermalright-trcc-linux](https://github.com/Lexonight1/thermalright-trcc-linux) — LY Bulk 프로토콜 리버스 엔지니어링
+- [fermion-star/apple_sensors](https://github.com/fermion-star/apple_sensors) — IOHIDEventSystemClient 온도 읽기
+
+## 라이선스
+
+MIT
+
+---
+
+Swift 6.3 + libusb로 개발. [Claude](https://claude.ai)와 공동 개발.
