@@ -114,6 +114,29 @@ USB 통신은 [thermalright-trcc-linux](https://github.com/Lexonight1/thermalrig
 - [thermalright-trcc-linux](https://github.com/Lexonight1/thermalright-trcc-linux) — LY Bulk 프로토콜 리버스 엔지니어링
 - [fermion-star/apple_sensors](https://github.com/fermion-star/apple_sensors) — IOHIDEventSystemClient 온도 읽기
 
+## 변경 이력
+
+### v1.1.1 (2026-03-28)
+- 수정: 디스크 언마운트(DMG 추출 등) 시 Disk I/O 산술 오버플로우 크래시
+
+### v1.1.0 (2026-03-28)
+- P-core / E-core 구분 표시
+- `sysctl hw.perflevel0.logicalcpu`로 코어 종류 감지
+- 요일 영어 표시
+- Network / I/O 차트 레이아웃 통일
+
+### v1.0.0 (2026-03-28)
+- 5패널 대시보드: CPU, GPU, Memory, Disk, System
+- Airflow 온도 (IOHIDEventSystemClient)
+- 네트워크 트래픽 미러 바 차트 (sysctl 64bit)
+- 디스크 I/O 미러 바 차트 (IOBlockStorageDriver)
+- USB 핫플러그 + 잠자기/깨우기 복구
+- 메뉴바 앱 (NSStatusItem, 연결 상태 배지)
+- 소프트웨어 밝기 10단계
+- 적응형 레이아웃 8~24+ 코어
+- About 메뉴 (버전 표시)
+- .app 번들 패키징 (libusb 내장)
+
 ## 라이선스
 
 MIT
