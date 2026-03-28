@@ -441,10 +441,12 @@ final class SystemMetricsCollector: @unchecked Sendable {
         if let prevTime = prevDiskTime {
             let elapsed = now.timeIntervalSince(prevTime)
             if elapsed > 0 && prevDiskRead > 0 {
-                readPerSec = Double(totalRead - prevDiskRead) / elapsed
-                writePerSec = Double(totalWrite - prevDiskWrite) / elapsed
-                if readPerSec < 0 { readPerSec = 0 }
-                if writePerSec < 0 { writePerSec = 0 }
+                if totalRead >= prevDiskRead {
+                    readPerSec = Double(totalRead - prevDiskRead) / elapsed
+                }
+                if totalWrite >= prevDiskWrite {
+                    writePerSec = Double(totalWrite - prevDiskWrite) / elapsed
+                }
             }
         }
 

@@ -106,6 +106,29 @@ Runs as a menu bar app. Click the display icon to see connection status, open Se
 - [thermalright-trcc-linux](https://github.com/Lexonight1/thermalright-trcc-linux) — LY Bulk protocol reverse engineering
 - [fermion-star/apple_sensors](https://github.com/fermion-star/apple_sensors) — IOHIDEventSystemClient temperature reading
 
+## Changelog
+
+### v1.1.1 (2026-03-28)
+- Fix: Disk I/O arithmetic overflow crash when disks are unmounted (e.g. DMG eject)
+
+### v1.1.0 (2026-03-28)
+- P-core / E-core distinction display
+- Core type detection via `sysctl hw.perflevel0.logicalcpu`
+- English day-of-week display
+- Unified Network / I/O chart layout
+
+### v1.0.0 (2026-03-28)
+- 5-panel dashboard: CPU, GPU, Memory, Disk, System
+- Airflow temperature (IOHIDEventSystemClient)
+- Network traffic mirror bar chart (sysctl 64-bit)
+- Disk I/O mirror bar chart (IOBlockStorageDriver)
+- USB hotplug + sleep/wake recovery
+- Menu bar app (NSStatusItem, connection status badge)
+- Software brightness (10 levels)
+- Adaptive layout for 8–24+ cores
+- About menu with version display
+- .app bundle packaging (embedded libusb)
+
 ## License
 
 MIT
