@@ -25,30 +25,37 @@ enum JPEGEncoder {
     /// Encode CGImage to JPEG Data with 180° rotation and brightness adjustment.
     /// Reduces quality if over 650KB (matches Python behavior).
     static func encode(
-        _ image: CGImage, brightness: Int = 1, maxBytes: Int = 650_000
+        _ image: CGImage, brightness: Int = 1, rotate: Bool = true, maxBytes: Int = 650_000
     ) -> Data? {
         let w = image.width
         let h = image.height
 
-        // Reuse rotation context
-        if rotateCtx == nil || rotateCtx!.width != w || rotateCtx!.height != h {
-            let colorSpace = CGColorSpaceCreateDeviceRGB()
-            rotateCtx = CGContext(
-                data: nil, width: w, height: h,
-                bitsPerComponent: 8, bytesPerRow: w * 4,
-                space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        var finalImage: CGImage
+
+        if !rotate {
+            // Reuse rotation context
+            if rotateCtx == nil || rotateCtx!.width != w || rotateCtx!.height != h {
+                let colorSpace = CGColorSpaceCreateDeviceRGB()
+                rotateCtx = CGContext(
+                    data: nil, width: w, height: h,
+                    bitsPerComponent: 8, bytesPerRow: w * 4,
+                    space: colorSpace,
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            }
+            guard let rotatedCtx = rotateCtx else { return nil }
+
+            // 180° rotation
+            rotatedCtx.saveGState()
+            rotatedCtx.translateBy(x: CGFloat(w), y: CGFloat(h))
+            rotatedCtx.scaleBy(x: -1, y: -1)
+            rotatedCtx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+            rotatedCtx.restoreGState()
+
+            guard let rotated = rotatedCtx.makeImage() else { return nil }
+            finalImage = rotated
+        } else {
+            finalImage = image
         }
-        guard let rotatedCtx = rotateCtx else { return nil }
-
-        // 180° rotation
-        rotatedCtx.saveGState()
-        rotatedCtx.translateBy(x: CGFloat(w), y: CGFloat(h))
-        rotatedCtx.scaleBy(x: -1, y: -1)
-        rotatedCtx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
-        rotatedCtx.restoreGState()
-
-        guard var finalImage = rotatedCtx.makeImage() else { return nil }
 
         // Apply brightness if needed
         if brightness > 1 {

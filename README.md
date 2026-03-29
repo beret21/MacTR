@@ -11,7 +11,8 @@ Turns the 1920x480 LCD on your Thermalright CPU cooler into a real-time system m
 ## Features
 
 - **5-panel dashboard**: CPU, GPU, Memory, Disk, System
-- **Airflow temperature** via IOHIDEventSystemClient (no sudo required)
+- **CPU temperature** via IOHIDEventSystemClient (no sudo required)
+- **180° rotation toggle** — Settings option for displays with inverted orientation
 - **Network traffic** with mirror bar chart (download/upload history)
 - **Disk I/O** with mirror bar chart (read/write history)
 - **USB hotplug** — auto-reconnect on plug/unplug and sleep/wake
@@ -88,7 +89,7 @@ Runs as a menu bar app. Click the display icon to see connection status, open Se
 
 | Panel | Metrics |
 |-------|---------|
-| **CPU** | Usage % arc gauge, per-core bars, airflow temperature, load average (1/5/15 min) |
+| **CPU** | Usage % arc gauge, per-core bars, CPU temperature, load average (1/5/15 min) |
 | **GPU** | Device/Renderer/Tiler utilization %, VRAM usage |
 | **Memory** | Active/Wired/Compressed/Available breakdown, swap, network traffic chart |
 | **Disk** | APFS container usage, read/write I/O chart |
@@ -107,6 +108,11 @@ Runs as a menu bar app. Click the display icon to see connection status, open Se
 - [fermion-star/apple_sensors](https://github.com/fermion-star/apple_sensors) — IOHIDEventSystemClient temperature reading
 
 ## Changelog
+
+### v1.2.0 (2026-03-29)
+- Add 180° rotation toggle in Settings > Display for displays with inverted orientation
+- Rename temperature label from "Airflow" to "Temp"
+- CLI: `--no-rotate` flag support
 
 ### v1.1.1 (2026-03-28)
 - Fix: Disk I/O arithmetic overflow crash when disks are unmounted (e.g. DMG eject)

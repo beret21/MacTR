@@ -210,10 +210,10 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         let bottomY = py + ph - 92
         if let cpuTemp = temp.cpuTemp {
             let tempColor = cpuTemp > 65 ? Color.red : (cpuTemp > 50 ? Color.orange : Color.green)
-            Draw.text(ctx, "Airflow", x: x + 16, y: bottomY,
+            Draw.text(ctx, "Temp", x: x + 16, y: bottomY,
                       font: Fonts.system(22, weight: .medium), color: Color.textL)
             Draw.text(ctx, String(format: "%.0f°C", cpuTemp),
-                      x: x + 108, y: bottomY - 2,
+                      x: x + 76, y: bottomY - 2,
                       font: Fonts.system(30, weight: .bold), color: tempColor)
         }
 

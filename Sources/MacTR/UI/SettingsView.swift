@@ -90,6 +90,16 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("Rotation") {
+                Toggle("Rotate 180°", isOn: $state.rotateDisplay)
+                    .onChange(of: state.rotateDisplay) {
+                        state.applySettings()
+                    }
+                Text("Enable if display appears upside down")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()

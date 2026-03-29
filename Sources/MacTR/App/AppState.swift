@@ -35,6 +35,7 @@ final class AppState {
     var currentSet: DisplaySet = .systemMonitor
     var brightness: Int = 5
     var refreshInterval: Double = 0.5
+    var rotateDisplay: Bool = false
 
     // Metrics (for menu bar display)
     var frameCount = 0
@@ -65,7 +66,7 @@ final class AppState {
             }
         }
         engine = eng
-        eng.start(set: currentSet, brightness: brightness, interval: refreshInterval)
+        eng.start(set: currentSet, brightness: brightness, interval: refreshInterval, rotate: rotateDisplay)
     }
 
     func stop() {
@@ -88,7 +89,7 @@ final class AppState {
 
     /// Called when user changes display set, brightness, or interval
     func applySettings() {
-        engine?.updateSettings(set: currentSet, brightness: brightness, interval: refreshInterval)
+        engine?.updateSettings(set: currentSet, brightness: brightness, interval: refreshInterval, rotate: rotateDisplay)
     }
 }
 
@@ -118,6 +119,7 @@ final class DisplayEngine: @unchecked Sendable {
     private var currentSet: DisplaySet = .systemMonitor
     private var brightness: Int = 5
     private var interval: Double = 0.5
+    private var rotateDisplay: Bool = false
 
     // Renderers
     private let monitorRenderer = MonitorRenderer()
@@ -126,10 +128,11 @@ final class DisplayEngine: @unchecked Sendable {
         self.statusCallback = statusCallback
     }
 
-    func start(set: DisplaySet, brightness: Int, interval: Double) {
+    func start(set: DisplaySet, brightness: Int, interval: Double, rotate: Bool) {
         self.currentSet = set
         self.brightness = brightness
         self.interval = interval
+        self.rotateDisplay = rotate
 
         usbQueue.async { [weak self] in
             self?.setupHotplug()
@@ -153,12 +156,12 @@ final class DisplayEngine: @unchecked Sendable {
         }
     }
 
-    func updateSettings(set: DisplaySet, brightness: Int, interval: Double) {
-        let setChanged = self.currentSet != set
-        log("[Engine] Settings updated: set=\(set.rawValue), brightness=\(brightness), interval=\(interval)")
+    func updateSettings(set: DisplaySet, brightness: Int, interval: Double, rotate: Bool) {
+        log("[Engine] Settings updated: set=\(set.rawValue), brightness=\(brightness), interval=\(interval), rotate=\(rotate)")
         self.currentSet = set
         self.brightness = brightness
         self.interval = interval
+        self.rotateDisplay = rotate
     }
 
     // MARK: - Private (all on usbQueue)
@@ -210,13 +213,14 @@ final class DisplayEngine: @unchecked Sendable {
             autoreleasepool {
                 let set = currentSet
                 let bright = brightness
+                let rotate = rotateDisplay
 
                 let jpeg: Data?
 
                 switch set {
                 case .systemMonitor:
                     if let image = monitorRenderer.render() {
-                        jpeg = JPEGEncoder.encode(image, brightness: bright)
+                        jpeg = JPEGEncoder.encode(image, brightness: bright, rotate: rotate)
                     } else {
                         jpeg = nil
                     }

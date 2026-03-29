@@ -301,9 +301,10 @@ private func runCLI() {
     let args = CommandLine.arguments
     let isTest = args.contains("--test")
     let brightness = parseFlag(args, flag: "-b") ?? 5
+    let rotate = !args.contains("--no-rotate")
 
     log("[*] MacTR CLI — \(isTest ? "USB Test" : "System Monitor")")
-    log("[*] Brightness: level \(brightness) (\(Brightness.factor(for: brightness))x)")
+    log("[*] Brightness: level \(brightness) (\(Brightness.factor(for: brightness))x), Rotate: \(rotate)")
     log("[*] Searching for Thermalright LCD...")
 
     let device = USBDevice()
@@ -343,7 +344,7 @@ private func runCLI() {
         var count = 0
         while true {
             guard let image = renderer.render(),
-                  let jpeg = JPEGEncoder.encode(image, brightness: brightness)
+                  let jpeg = JPEGEncoder.encode(image, brightness: brightness, rotate: rotate)
             else {
                 Thread.sleep(forTimeInterval: 1)
                 continue
