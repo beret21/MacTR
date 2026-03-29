@@ -74,6 +74,7 @@ swift build -c release
 
 ```bash
 ./MacTR --cli                    # LCD에 시스템 모니터 표시
+./MacTR --cli --rotate           # 180° 회전 활성화
 ./MacTR --cli --test             # USB 연결 테스트
 ./MacTR --cli -b 7              # 밝기 7단계
 ```
@@ -120,7 +121,7 @@ USB 통신은 [thermalright-trcc-linux](https://github.com/Lexonight1/thermalrig
 ### v1.2.0 (2026-03-29)
 - 설정 > Display에 180° 회전 토글 추가 (화면이 뒤집혀 보이는 하드웨어 대응)
 - 온도 라벨 "Airflow" → "Temp" 변경 (팬 없는 맥북에어 등 고려)
-- CLI: `--no-rotate` 플래그 지원
+- CLI: `--rotate` 플래그로 180° 회전 활성화
 
 ### v1.1.1 (2026-03-28)
 - 수정: 디스크 언마운트(DMG 추출 등) 시 Disk I/O 산술 오버플로우 크래시

@@ -74,6 +74,7 @@ Runs as a menu bar app. Click the display icon to see connection status, open Se
 
 ```bash
 ./MacTR --cli                    # System monitor on LCD
+./MacTR --cli --rotate           # Enable 180° rotation
 ./MacTR --cli --test             # USB connection test
 ./MacTR --cli -b 7              # Set brightness level 7
 ```
@@ -112,7 +113,7 @@ Runs as a menu bar app. Click the display icon to see connection status, open Se
 ### v1.2.0 (2026-03-29)
 - Add 180° rotation toggle in Settings > Display for displays with inverted orientation
 - Rename temperature label from "Airflow" to "Temp"
-- CLI: `--no-rotate` flag support
+- CLI: `--rotate` flag to enable 180° rotation
 
 ### v1.1.1 (2026-03-28)
 - Fix: Disk I/O arithmetic overflow crash when disks are unmounted (e.g. DMG eject)

@@ -301,7 +301,7 @@ private func runCLI() {
     let args = CommandLine.arguments
     let isTest = args.contains("--test")
     let brightness = parseFlag(args, flag: "-b") ?? 5
-    let rotate = !args.contains("--no-rotate")
+    let rotate = args.contains("--rotate")
 
     log("[*] MacTR CLI — \(isTest ? "USB Test" : "System Monitor")")
     log("[*] Brightness: level \(brightness) (\(Brightness.factor(for: brightness))x), Rotate: \(rotate)")
