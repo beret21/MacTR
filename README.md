@@ -25,7 +25,7 @@ Turns the 1920x480 LCD on your Thermalright CPU cooler into a real-time system m
 
 | | |
 |---|---|
-| **Product** | [Thermalright Trofeo Vision 9.16 LCD](https://www.thermalright.com/product/trofeo-vision-9-16-lcd-black/) ([White](https://www.thermalright.com/product/trofeo-vision-9-16-lcd-white/)) |
+| **Product** | <a href="https://www.thermalright.com/product/trofeo-vision-9-16-lcd-black/" target="_blank">Thermalright Trofeo Vision 9.16 LCD</a> (<a href="https://www.thermalright.com/product/trofeo-vision-9-16-lcd-white/" target="_blank">White</a>) |
 | **Display** | 9.16" IPS, 1920 x 480 |
 | **Connection** | USB Type-C (USB 2.0) |
 | **Windows Software** | [TRCC (official)](https://www.thermalright.com/support/download/) |
@@ -135,6 +135,12 @@ Runs as a menu bar app. Click the display icon to see connection status, open Se
 - Adaptive layout for 8–24+ cores
 - About menu with version display
 - .app bundle packaging (embedded libusb)
+
+## Support
+
+If you find this useful, consider buying me a coffee :)
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/beret21)
 
 ## License
 
