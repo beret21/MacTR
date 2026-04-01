@@ -150,6 +150,10 @@ USB 통신은 [thermalright-trcc-linux](https://github.com/Lexonight1/thermalrig
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/beret21)
 
+## 문의
+
+질문, 버그 리포트, 기능 요청은 [Issue](https://github.com/beret21/MacTR/issues)를 열어주세요.
+
 ## 라이선스
 
 MIT

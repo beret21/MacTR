@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>MacTR Updates</title>
+        <link>https://github.com/beret21/MacTR</link>
+        <description>Software updates for MacTR</description>
+        <language>en</language>
+
+        <item>
+            <title>MacTR 1.3.0</title>
+            <link>https://github.com/beret21/MacTR/releases/tag/v1.3.0</link>
+            <sparkle:version>1.3.0</sparkle:version>
+            <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+            <sparkle:releaseNotesLink>https://github.com/beret21/MacTR/releases/tag/v1.3.0</sparkle:releaseNotesLink>
+            <pubDate>Wed, 02 Apr 2026 00:00:00 +0900</pubDate>
+            <enclosure
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.0/MacTR-1.3.0.zip"
+                sparkle:edSignature="vi1KoWiXgh9RlsPNYt8YyKJDaPIkFdhe4cgGrhctB5Dp0Wi+NvCMBxeqBaGeNxu5RJDgkIqk+xNJshYt69+pCg=="
+                length="1630804"
+                type="application/octet-stream" />
+        </item>
+
+    </channel>
+</rss>

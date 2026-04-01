@@ -4,3 +4,16 @@ __pycache__/
 .claude/
 ThermalVision/.build/
 MacTR/.build/
+.build/
+
+# Build artifacts
+*.zip
+*.dmg
+*.app
+
+# Internal docs (not for public repo)
+CLAUDE.md
+DEVELOPMENT.md
+LESSONS_LEARNED.md
+RESEARCH_*.md
+build.sh

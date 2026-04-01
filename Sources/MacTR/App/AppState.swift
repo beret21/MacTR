@@ -135,13 +135,17 @@ final class DisplayEngine: @unchecked Sendable {
         self.rotateDisplay = rotate
 
         usbQueue.async { [weak self] in
-            self?.setupHotplug()
-            self?.connectAndRun()
+            guard let self else { return }
+            // Start background metrics collection (primes before returning)
+            self.monitorRenderer.startMetrics()
+            self.setupHotplug()
+            self.connectAndRun()
         }
     }
 
     func stop() {
         running = false
+        monitorRenderer.stopMetrics()
         usbQueue.async { [weak self] in
             self?.hotplug?.stop()
             self?.hotplug = nil
@@ -202,12 +206,14 @@ final class DisplayEngine: @unchecked Sendable {
 
     private func runFrameLoop(device: USBDevice, info: DeviceInfo) {
         running = true
+        // Metrics already collecting in background via startMetrics()
 
-        // Prime CPU metrics
-        _ = monitorRenderer.render()
-        Thread.sleep(forTimeInterval: 0.3)
+        var nextDeadline = DispatchTime.now()
 
         while running {
+            // Schedule next frame deadline BEFORE work starts
+            nextDeadline = nextDeadline + .milliseconds(Int(interval * 1000))
+
             // autoreleasepool forces CG raster data / CGImage release each frame
             // Without this, Core Graphics caches hundreds of 3.6MB images → GB leak
             autoreleasepool {
@@ -253,7 +259,15 @@ final class DisplayEngine: @unchecked Sendable {
                 }
             }  // autoreleasepool
 
-            Thread.sleep(forTimeInterval: interval)
+            // Sleep only the remaining time until next deadline
+            // If work took longer than interval, send next frame immediately
+            let now = DispatchTime.now()
+            if nextDeadline > now {
+                Thread.sleep(forTimeInterval: Double(nextDeadline.uptimeNanoseconds - now.uptimeNanoseconds) / 1_000_000_000)
+            } else {
+                // Work exceeded interval — reset deadline to avoid cascading catch-up
+                nextDeadline = now
+            }
         }
     }
 

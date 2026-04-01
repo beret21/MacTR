@@ -6,6 +6,7 @@
 // CLI mode: --cli flag for headless operation.
 
 import AppKit
+import Sparkle
 import SwiftUI
 
 /// Flush stdout after print (Swift buffers when piped)
@@ -73,6 +74,10 @@ final class StatusBarController: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var statusItem: NSStatusItem!
     private let appState = AppState()
     private var menu: NSMenu!
+
+    // Sparkle auto-updater
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
     // Menu items that need updating
     private var statusMenuItem: NSMenuItem!
@@ -223,6 +228,14 @@ final class StatusBarController: NSObject, NSApplicationDelegate, NSMenuDelegate
         let aboutItem = NSMenuItem(title: "About MacTR", action: #selector(showAbout), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
+
+        // Check for Updates
+        let checkUpdatesItem = NSMenuItem(
+            title: "Check for Updates...",
+            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+            keyEquivalent: "")
+        checkUpdatesItem.target = updaterController
+        menu.addItem(checkUpdatesItem)
 
         menu.addItem(.separator())
 

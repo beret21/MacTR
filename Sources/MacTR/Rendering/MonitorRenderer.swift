@@ -10,14 +10,22 @@ import Foundation
 final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
 
     private let collector = SystemMetricsCollector()
-    private var gpuCache: GPUSnapshot?
-    private var gpuTick = 0
 
-    // Cache expensive metrics (subprocess calls, IOKit)
-    private var netCache: NetworkSnapshot?
-    private var diskIOCache: DiskIOSnapshot?
-    private var tempCache: TemperatureSnapshot?
-    private var slowTick = 0  // increments each render, expensive ops every 4th frame (~2s)
+    // Background metrics collection — decoupled from frame loop for consistent refresh
+    private let metricsQueue = DispatchQueue(label: "com.thermalvision.metrics")
+    private var metricsRunning = false
+    private let lock = NSLock()
+
+    // Cached snapshots (written by metricsQueue, read by render thread)
+    private var _cpu: CPUSnapshot?
+    private var _mem: MemorySnapshot?
+    private var _gpu: GPUSnapshot?
+    private var _disk: DiskSnapshot?
+    private var _net: NetworkSnapshot?
+    private var _diskIO: DiskIOSnapshot?
+    private var _temp: TemperatureSnapshot?
+    private var _bat: BatterySnapshot?
+    private var _sys: SystemSnapshot?
 
     // Reusable CGContext — avoids allocating 3.6MB every 0.5s (prevents CG raster data leak)
     private var reusableCtx: CGContext?
@@ -34,29 +42,100 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         if buffer.count > sparklineSize { buffer.removeFirst() }
     }
 
-    /// Render with simulated core count for layout testing
+    /// Start background metrics collection. Call before first render().
+    /// Primes all metrics synchronously, then starts async collection loop.
+    func startMetrics() {
+        guard !metricsRunning else { return }
+        metricsRunning = true
+        // First pass: prime CPU ticks (deltas will be zero)
+        let cpu0 = collector.collectCPU()
+        let mem = collector.collectMemory()
+        let bat = collector.collectBattery()
+        let sys = collector.collectSystem()
+        let gpu = collector.collectGPU()
+        let disk = collector.collectDisk()
+        let net = collector.collectNetwork()
+        let diskIO = collector.collectDiskIO()
+        let temp = collector.collectTemperature()
+        lock.lock()
+        _cpu = cpu0; _mem = mem; _bat = bat; _sys = sys
+        _gpu = gpu; _disk = disk; _net = net; _diskIO = diskIO; _temp = temp
+        lock.unlock()
+
+        // Second pass: get real CPU deltas
+        Thread.sleep(forTimeInterval: 0.3)
+        let cpu1 = collector.collectCPU()
+        lock.lock()
+        _cpu = cpu1
+        lock.unlock()
+
+        // Start async collection loop
+        metricsQueue.async { [weak self] in self?.metricsLoop() }
+    }
+
+    func stopMetrics() {
+        metricsRunning = false
+    }
+
+    private func metricsLoop() {
+        var slowTick = 0
+        while metricsRunning {
+            // Fast metrics every tick
+            let cpu = collector.collectCPU()
+            let mem = collector.collectMemory()
+            let bat = collector.collectBattery()
+            let sys = collector.collectSystem()
+            lock.lock()
+            _cpu = cpu; _mem = mem; _bat = bat; _sys = sys
+            lock.unlock()
+
+            // Slow metrics every 4th tick (~2s)
+            slowTick += 1
+            if slowTick >= 4 {
+                let gpu = collector.collectGPU()
+                let disk = collector.collectDisk()
+                let net = collector.collectNetwork()
+                let diskIO = collector.collectDiskIO()
+                let temp = collector.collectTemperature()
+                lock.lock()
+                _gpu = gpu; _disk = disk; _net = net; _diskIO = diskIO; _temp = temp
+                lock.unlock()
+                slowTick = 0
+            }
+
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+    }
+
+    /// Render with fully simulated data (for screenshots — no real system info)
     func renderSimulated(coreCount: Int) -> CGImage? {
         let fakeCores = (0..<coreCount).map { _ in Double.random(in: 5...95) }
         let cpu = CPUSnapshot(perCore: fakeCores,
                               total: fakeCores.reduce(0, +) / Double(coreCount),
                               loadAvg: (3.5, 4.2, 3.8),
                               pCoreCount: max(coreCount - 2, coreCount * 3 / 4))
-        let mem = collector.collectMemory()
-        let bat = collector.collectBattery()
-        let sys = collector.collectSystem()
-        let disk = collector.collectDisk()
-        let net = collector.collectNetwork()
-        let diskIO = collector.collectDiskIO()
-        let temp = TemperatureSnapshot(cpuTemp: 72, gpuTemp: 68, thermalState: 0)
+        let gb: UInt64 = 1024 * 1024 * 1024
+        let mem = MemorySnapshot(
+            total: 32 * gb, active: 8 * gb, wired: 4 * gb,
+            compressed: 2 * gb, available: 18 * gb,
+            swapUsed: 512 * 1024 * 1024, swapTotal: 4 * gb)
+        let bat = BatterySnapshot(percent: 85, isCharging: false, isPresent: true)
+        let sys = SystemSnapshot(uptimeSeconds: 86400 + 7200 + 1800, processCount: 412)
+        let disk = DiskSnapshot(totalGB: 1000, usedGB: 420, freeGB: 580)
+        let net = NetworkSnapshot(rxBytesPerSec: 2_500_000, txBytesPerSec: 350_000)
+        let diskIO = DiskIOSnapshot(readBytesPerSec: 15_000_000, writeBytesPerSec: 8_000_000)
+        let temp = TemperatureSnapshot(cpuTemp: 52, gpuTemp: 45, thermalState: 0)
+        let gpu = GPUSnapshot(name: "Apple GPU", cores: 30,
+                              deviceUtil: 12, rendererUtil: 8, tilerUtil: 5,
+                              memUsedMB: 1280, memAllocMB: 2560)
 
-        gpuTick += 1
-        if gpuTick >= 2 || gpuCache == nil { gpuCache = collector.collectGPU(); gpuTick = 0 }
-        let gpu = gpuCache!
-
-        pushSample(&netRxHistory, net.rxBytesPerSec)
-        pushSample(&netTxHistory, net.txBytesPerSec)
-        pushSample(&diskReadHistory, diskIO.readBytesPerSec)
-        pushSample(&diskWriteHistory, diskIO.writeBytesPerSec)
+        // Fill sparklines with random history
+        for _ in 0..<sparklineSize {
+            pushSample(&netRxHistory, Double.random(in: 500_000...5_000_000))
+            pushSample(&netTxHistory, Double.random(in: 100_000...800_000))
+            pushSample(&diskReadHistory, Double.random(in: 1_000_000...30_000_000))
+            pushSample(&diskWriteHistory, Double.random(in: 500_000...15_000_000))
+        }
 
         let w = Layout.width, h = Layout.height
         let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -75,30 +154,16 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
     }
 
     func render() -> CGImage? {
-        // Collect metrics
-        let cpu = collector.collectCPU()
-        let mem = collector.collectMemory()
-        let bat = collector.collectBattery()
-        let sys = collector.collectSystem()
-        let disk = collector.collectDisk()
-        // Expensive metrics: every 4th frame (~2s) to reduce subprocess/IOKit overhead
-        slowTick += 1
-        if slowTick >= 4 || netCache == nil {
-            netCache = collector.collectNetwork()
-            diskIOCache = collector.collectDiskIO()
-            tempCache = collector.collectTemperature()
-            slowTick = 0
+        // Read cached metrics (never blocks — uses latest available values)
+        lock.lock()
+        guard let cpu = _cpu, let mem = _mem, let gpu = _gpu,
+              let disk = _disk, let net = _net, let diskIO = _diskIO,
+              let temp = _temp, let bat = _bat, let sys = _sys
+        else {
+            lock.unlock()
+            return nil
         }
-        let net = netCache!
-        let diskIO = diskIOCache!
-        let temp = tempCache!
-
-        gpuTick += 1
-        if gpuTick >= 4 || gpuCache == nil {
-            gpuCache = collector.collectGPU()
-            gpuTick = 0
-        }
-        let gpu = gpuCache!
+        lock.unlock()
 
         // Update sparkline histories
         pushSample(&netRxHistory, net.rxBytesPerSec)

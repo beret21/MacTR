@@ -6,6 +6,9 @@ let package = Package(
     platforms: [
         .macOS(.v26)
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.0.0"),
+    ],
     targets: [
         .systemLibrary(
             name: "CLibUSB",
@@ -23,7 +26,11 @@ let package = Package(
         ),
         .executableTarget(
             name: "MacTR",
-            dependencies: ["CLibUSB", "CThermalSensor"],
+            dependencies: [
+                "CLibUSB",
+                "CThermalSensor",
+                .product(name: "Sparkle", package: "Sparkle"),
+            ],
             path: "Sources/MacTR",
             swiftSettings: [
                 .unsafeFlags(["-I/opt/homebrew/include/libusb-1.0"]),

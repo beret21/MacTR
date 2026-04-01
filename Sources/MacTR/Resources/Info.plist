@@ -2,7 +2,33 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.beret21.MacTR</string>
+    <key>CFBundleName</key>
+    <string>MacTR</string>
+    <key>CFBundleDisplayName</key>
+    <string>MacTR</string>
+    <key>CFBundleVersion</key>
+    <string>1.3.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.3.0</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+
+    <!-- Sparkle Auto-Update -->
+    <key>SUFeedURL</key>
+    <string>https://raw.githubusercontent.com/beret21/MacTR/main/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>cFBwTLEG3a+RMA0SIGpWpITuHaaeg7qPKeZXnOh5R64=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
 </dict>
 </plist>

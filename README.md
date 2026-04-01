@@ -142,6 +142,10 @@ If you find this useful, consider buying me a coffee :)
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/beret21)
 
+## Contact
+
+Questions, bugs, or feature requests? [Open an issue](https://github.com/beret21/MacTR/issues).
+
 ## License
 
 MIT
