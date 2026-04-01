@@ -111,6 +111,12 @@ Runs as a menu bar app. Click the display icon to see connection status, open Se
 
 ## Changelog
 
+### v1.3.3 (2026-04-02)
+- Fix app bundle permissions (700 → 755) for seamless Sparkle auto-updates
+
+### v1.3.2 (2026-04-02)
+- Clean inline release notes in update dialog (replaces GitHub page embed)
+
 ### v1.3.1 (2026-04-02)
 - Show version number (MacTR vX.Y.Z) at top of menu bar dropdown
 - Move "Check for Updates..." to dedicated section with ⌘U shortcut

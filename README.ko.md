@@ -119,6 +119,12 @@ USB 통신은 [thermalright-trcc-linux](https://github.com/Lexonight1/thermalrig
 
 ## 변경 이력
 
+### v1.3.3 (2026-04-02)
+- 앱 번들 권한 수정 (700 → 755)으로 Sparkle 자동 업데이트 안정화
+
+### v1.3.2 (2026-04-02)
+- 업데이트 다이얼로그에 깔끔한 인라인 릴리즈 노트 표시 (GitHub 페이지 임베드 제거)
+
 ### v1.3.1 (2026-04-02)
 - 메뉴바 드롭다운 상단에 버전 번호(MacTR vX.Y.Z) 표시
 - "Check for Updates..." 메뉴 항목 분리 및 ⌘U 단축키 추가
