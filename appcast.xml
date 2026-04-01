@@ -7,9 +7,9 @@
         <language>en</language>
 
         <item>
-            <title>MacTR 1.3.2</title>
-            <sparkle:version>1.3.2</sparkle:version>
-            <sparkle:shortVersionString>1.3.2</sparkle:shortVersionString>
+            <title>MacTR 1.3.3</title>
+            <sparkle:version>1.3.3</sparkle:version>
+            <sparkle:shortVersionString>1.3.3</sparkle:shortVersionString>
             <description><![CDATA[
                 <style>
                     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #333; padding: 8px; }
@@ -18,6 +18,10 @@
                     li { margin: 2px 0; }
                     .version { color: #888; font-size: 12px; }
                 </style>
+                <h3>v1.3.3</h3>
+                <ul>
+                    <li>Fix app permissions for seamless Sparkle updates</li>
+                </ul>
                 <h3>v1.3.2</h3>
                 <ul>
                     <li>Update dialog now shows clean release notes</li>
@@ -35,9 +39,9 @@
             ]]></description>
             <pubDate>Wed, 02 Apr 2026 00:00:00 +0900</pubDate>
             <enclosure
-                url="https://github.com/beret21/MacTR/releases/download/v1.3.2/MacTR-1.3.2.zip"
-                sparkle:edSignature="3KbR86HgmTuxFIQpViMkxD8bHWkwVTcaIqhlugsh9u0RdB5N3GBu5PqOBDMnD7YqLzdR9yK7msYppIUKGfL5Aw=="
-                length="1682766"
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.3/MacTR-1.3.3.zip"
+                sparkle:edSignature="stB/vNcscSkDXOh2b9D395ERNCRPwKDEaeasR4R5QbNF96wLnHTRW2GGLR6TdVoByJ/ev3p5on2eUHhG79WqAQ=="
+                length="1682769"
                 type="application/octet-stream" />
         </item>
 
