@@ -7,16 +7,37 @@
         <language>en</language>
 
         <item>
-            <title>MacTR 1.3.1</title>
-            <link>https://github.com/beret21/MacTR/releases/tag/v1.3.1</link>
-            <sparkle:version>1.3.1</sparkle:version>
-            <sparkle:shortVersionString>1.3.1</sparkle:shortVersionString>
-            <sparkle:releaseNotesLink>https://github.com/beret21/MacTR/releases/tag/v1.3.1</sparkle:releaseNotesLink>
+            <title>MacTR 1.3.2</title>
+            <sparkle:version>1.3.2</sparkle:version>
+            <sparkle:shortVersionString>1.3.2</sparkle:shortVersionString>
+            <description><![CDATA[
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #333; padding: 8px; }
+                    h3 { font-size: 14px; margin: 8px 0 4px; }
+                    ul { padding-left: 20px; margin: 4px 0; }
+                    li { margin: 2px 0; }
+                    .version { color: #888; font-size: 12px; }
+                </style>
+                <h3>v1.3.2</h3>
+                <ul>
+                    <li>Update dialog now shows clean release notes</li>
+                </ul>
+                <h3>v1.3.1</h3>
+                <ul>
+                    <li>Show version number at top of menu bar dropdown</li>
+                    <li>Check for Updates with &#8984;U shortcut</li>
+                </ul>
+                <h3>v1.3.0</h3>
+                <ul>
+                    <li>Background metrics collection for smooth refresh</li>
+                    <li>Auto-update via Sparkle</li>
+                </ul>
+            ]]></description>
             <pubDate>Wed, 02 Apr 2026 00:00:00 +0900</pubDate>
             <enclosure
-                url="https://github.com/beret21/MacTR/releases/download/v1.3.1/MacTR-1.3.1.zip"
-                sparkle:edSignature="Oj7Y72PcP7aTyix6hIJeNhs5sGzc7ajgJFpu7wPHHEtSNlz/5rbMSnqrcbxVOXkLcjJmPK9/iKczBd9MZaKQDg=="
-                length="1682747"
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.2/MacTR-1.3.2.zip"
+                sparkle:edSignature="gvola5dP3k3Et+mWwhedWDHVvilD6MopABKr6kkJdcPfQPKD6qGcwzhWom79RiAiDY99JYe0y+1THSoVlYxNBA=="
+                length="1682742"
                 type="application/octet-stream" />
         </item>
 
