@@ -81,6 +81,7 @@ final class StatusBarController: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     // Menu items that need updating
     private var statusMenuItem: NSMenuItem!
+    private var versionMenuItem: NSMenuItem!
     private var reconnectItem: NSMenuItem!
     private var updateTimer: Timer?
 
@@ -207,6 +208,12 @@ final class StatusBarController: NSObject, NSApplicationDelegate, NSMenuDelegate
     private func buildMenu() {
         menu = NSMenu()
 
+        // App title + version
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.3.0"
+        versionMenuItem = NSMenuItem(title: "MacTR v\(version)", action: nil, keyEquivalent: "")
+        versionMenuItem.isEnabled = false
+        menu.addItem(versionMenuItem)
+
         // Status
         statusMenuItem = NSMenuItem(title: "Disconnected", action: nil, keyEquivalent: "")
         statusMenuItem.isEnabled = false
@@ -224,18 +231,20 @@ final class StatusBarController: NSObject, NSApplicationDelegate, NSMenuDelegate
         settingsItem.target = self
         menu.addItem(settingsItem)
 
-        // About
-        let aboutItem = NSMenuItem(title: "About MacTR", action: #selector(showAbout), keyEquivalent: "")
-        aboutItem.target = self
-        menu.addItem(aboutItem)
+        menu.addItem(.separator())
 
         // Check for Updates
         let checkUpdatesItem = NSMenuItem(
             title: "Check for Updates...",
             action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
-            keyEquivalent: "")
+            keyEquivalent: "u")
         checkUpdatesItem.target = updaterController
         menu.addItem(checkUpdatesItem)
+
+        // About
+        let aboutItem = NSMenuItem(title: "About MacTR", action: #selector(showAbout), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
 
         menu.addItem(.separator())
 
