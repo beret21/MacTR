@@ -20,6 +20,7 @@ Turns the 1920x480 LCD on your Thermalright CPU cooler into a real-time system m
 - **Connection status badge** — red indicator when LCD is disconnected
 - **Software brightness** — 10 levels
 - **Adaptive layout** — supports 8 to 24+ CPU cores (M1 through M5)
+- **Auto-update** — daily check via Sparkle, or manual ⌘U
 
 ## Hardware
 
@@ -44,9 +45,9 @@ Turns the 1920x480 LCD on your Thermalright CPU cooler into a real-time system m
 
 ### Download (recommended)
 
-1. Download `MacTR.dmg` from [Releases](https://github.com/beret21/MacTR/releases)
-2. Open the DMG and drag `MacTR.app` to Applications
-3. First launch: **Right-click → Open** (required once for unsigned apps)
+1. Download `MacTR-x.y.z.zip` from [Releases](https://github.com/beret21/MacTR/releases)
+2. Unzip and move `MacTR.app` to Applications
+3. After initial install, updates are delivered automatically via Sparkle
 
 ### Build from source
 
@@ -109,6 +110,16 @@ Runs as a menu bar app. Click the display icon to see connection status, open Se
 - [fermion-star/apple_sensors](https://github.com/fermion-star/apple_sensors) — IOHIDEventSystemClient temperature reading
 
 ## Changelog
+
+### v1.3.1 (2026-04-02)
+- Show version number (MacTR vX.Y.Z) at top of menu bar dropdown
+- Move "Check for Updates..." to dedicated section with ⌘U shortcut
+
+### v1.3.0 (2026-04-02)
+- Background metrics collection — frame refresh never blocked by system data
+- Deadline-based frame timing for consistent 0.5s refresh intervals
+- Auto-update via Sparkle (daily check + manual ⌘U)
+- Disk metrics cached to reduce subprocess overhead
 
 ### v1.2.0 (2026-03-29)
 - Add 180° rotation toggle in Settings > Display for displays with inverted orientation
