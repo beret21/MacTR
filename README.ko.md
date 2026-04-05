@@ -119,6 +119,11 @@ USB 통신은 [thermalright-trcc-linux](https://github.com/Lexonight1/thermalrig
 
 ## 변경 이력
 
+### v1.3.4 (2026-04-05)
+- 폰트 캐시 버그 수정 — 패널 간 잘못된 폰트 weight로 텍스트 렌더링되던 문제 해결
+- 스냅샷 모드 수정 (`--snapshot`에서 `--cores` 없이 사용 시 파일 미생성 문제)
+- LCD 연결 해제 시 메트릭 수집 중지 (CPU/리소스 절약)
+
 ### v1.3.3 (2026-04-02)
 - 앱 번들 권한 수정 (700 → 755)으로 Sparkle 자동 업데이트 안정화
 

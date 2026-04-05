@@ -279,6 +279,7 @@ final class DisplayEngine: @unchecked Sendable {
             self.usbQueue.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 guard let self, !self.running else { return }
                 log("[Hotplug] Attempting reconnect...")
+                self.monitorRenderer.startMetrics()
                 self.connectAndRun()
             }
         }
@@ -287,6 +288,7 @@ final class DisplayEngine: @unchecked Sendable {
             guard let self else { return }
             log("[Hotplug] Device removed")
             self.running = false
+            self.monitorRenderer.stopMetrics()
             self.usbQueue.async { [weak self] in
                 self?.device?.close()
                 self?.device = nil

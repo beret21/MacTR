@@ -67,14 +67,20 @@ enum Layout {
 // MARK: - Fonts
 
 enum Fonts {
-    nonisolated(unsafe) private static var cache: [CGFloat: NSFont] = [:]
+    private struct FontKey: Hashable {
+        let size: CGFloat
+        let weight: NSFont.Weight
+    }
+
+    nonisolated(unsafe) private static var cache: [FontKey: NSFont] = [:]
 
     static func system(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
-        if let cached = cache[size] {
+        let key = FontKey(size: size, weight: weight)
+        if let cached = cache[key] {
             return cached
         }
         let font = NSFont.systemFont(ofSize: size, weight: weight)
-        cache[size] = font
+        cache[key] = font
         return font
     }
 

@@ -32,8 +32,8 @@ struct MacTREntry {
             let renderer = MonitorRenderer()
             let simCores = parseFlag(CommandLine.arguments, flag: "--cores")
 
-            // Prime
-            _ = renderer.render()
+            // Prime metrics collection (required for real data render)
+            renderer.startMetrics()
             Thread.sleep(forTimeInterval: 0.5)
             for _ in 0..<30 { _ = renderer.render(); Thread.sleep(forTimeInterval: 0.1) }
 

@@ -111,6 +111,11 @@ Runs as a menu bar app. Click the display icon to see connection status, open Se
 
 ## Changelog
 
+### v1.3.4 (2026-04-05)
+- Fix font cache bug — text rendered with wrong font weights across panels
+- Fix snapshot mode (`--snapshot` without `--cores` produced no output)
+- Stop metrics collection when LCD is disconnected (saves CPU/resources)
+
 ### v1.3.3 (2026-04-02)
 - Fix app bundle permissions (700 → 755) for seamless Sparkle auto-updates
 
