@@ -357,7 +357,7 @@ private func runCLI() {
         cliFrameLoop(device: device, staticJPEG: jpeg)
     } else {
         let renderer = MonitorRenderer()
-        _ = renderer.render()
+        renderer.startMetrics()
         Thread.sleep(forTimeInterval: 0.3)
 
         log("[*] Sending frames (press Ctrl+C to stop)...")

@@ -44,8 +44,10 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
 
     /// Start background metrics collection. Call before first render().
     /// Primes all metrics synchronously, then starts async collection loop.
+    /// Safe to call multiple times — returns immediately if already running.
     func startMetrics() {
         guard !metricsRunning else { return }
+        log("[Metrics] Starting collection...")
         metricsRunning = true
         // First pass: prime CPU ticks (deltas will be zero)
         let cpu0 = collector.collectCPU()
@@ -74,10 +76,12 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
     }
 
     func stopMetrics() {
+        log("[Metrics] Stopping collection")
         metricsRunning = false
     }
 
     private func metricsLoop() {
+        log("[Metrics] Loop started on metricsQueue")
         var slowTick = 0
         while metricsRunning {
             // Fast metrics every tick
@@ -105,6 +109,7 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
 
             Thread.sleep(forTimeInterval: 0.5)
         }
+        log("[Metrics] Loop exited (metricsRunning=false)")
     }
 
     /// Render with fully simulated data (for screenshots — no real system info)

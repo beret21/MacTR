@@ -111,6 +111,13 @@ Runs as a menu bar app. Click the display icon to see connection status, open Se
 
 ## Changelog
 
+### v1.3.5 (2026-04-09)
+- Fix metrics freeze after sleep/wake — CPU, GPU, Memory, Disk stayed frozen while clock kept updating
+- Ensure metrics collection restarts on all reconnect paths (wake, hotplug, error recovery, manual reconnect)
+- Add 5-second timeout to diskutil subprocess to prevent metrics queue from hanging
+- Fix CLI mode not starting metrics collection (frames were never rendered)
+- Add diagnostic logging for metrics lifecycle (start/stop/loop events)
+
 ### v1.3.4 (2026-04-05)
 - Fix font cache bug — text rendered with wrong font weights across panels
 - Fix snapshot mode (`--snapshot` without `--cores` produced no output)

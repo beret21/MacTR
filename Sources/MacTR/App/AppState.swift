@@ -171,6 +171,9 @@ final class DisplayEngine: @unchecked Sendable {
     // MARK: - Private (all on usbQueue)
 
     private func connectAndRun() {
+        // Ensure metrics collection is running (may have been stopped on disconnect/sleep)
+        monitorRenderer.startMetrics()
+
         // Close existing connection
         device?.close()
         device = nil

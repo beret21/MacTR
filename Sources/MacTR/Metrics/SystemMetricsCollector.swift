@@ -281,8 +281,18 @@ final class SystemMetricsCollector: @unchecked Sendable {
 
         do {
             try proc.run()
-            proc.waitUntilExit()
         } catch { return nil }
+
+        // Wait with timeout to prevent hanging the metrics queue
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            proc.waitUntilExit()
+            done.signal()
+        }
+        if done.wait(timeout: .now() + 5) == .timedOut {
+            proc.terminate()
+            return nil
+        }
 
         let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
 
