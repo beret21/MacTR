@@ -6,13 +6,14 @@
 // CLI mode: --cli flag for headless operation.
 
 import AppKit
+import os
 import Sparkle
 import SwiftUI
 
-/// Flush stdout after print (Swift buffers when piped)
+private let mactrLogger = Logger(subsystem: "com.beret21.MacTR", category: "main")
+
 func log(_ message: String) {
-    print(message)
-    fflush(stdout)
+    mactrLogger.info("\(message, privacy: .public)")
 }
 
 // MARK: - App Entry Point

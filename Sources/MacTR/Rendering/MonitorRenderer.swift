@@ -46,9 +46,11 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
     /// Primes all metrics synchronously, then starts async collection loop.
     /// Safe to call multiple times — returns immediately if already running.
     func startMetrics() {
-        guard !metricsRunning else { return }
-        log("[Metrics] Starting collection...")
+        lock.lock()
+        guard !metricsRunning else { lock.unlock(); return }
         metricsRunning = true
+        lock.unlock()
+        log("[Metrics] Starting collection...")
         // First pass: prime CPU ticks (deltas will be zero)
         let cpu0 = collector.collectCPU()
         let mem = collector.collectMemory()

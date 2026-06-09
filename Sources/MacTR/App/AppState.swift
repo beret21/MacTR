@@ -171,6 +171,8 @@ final class DisplayEngine: @unchecked Sendable {
     // MARK: - Private (all on usbQueue)
 
     private func connectAndRun() {
+        guard !running else { return }
+
         // Ensure metrics collection is running (may have been stopped on disconnect/sleep)
         monitorRenderer.startMetrics()
 
@@ -254,9 +256,7 @@ final class DisplayEngine: @unchecked Sendable {
 
                         log("[Engine] Will retry connection in 5s...")
                         Thread.sleep(forTimeInterval: 5)
-                        if !running {
-                            connectAndRun()
-                        }
+                        connectAndRun()
                         return
                     }
                 }
