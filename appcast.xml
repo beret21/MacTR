@@ -7,6 +7,31 @@
         <language>en</language>
 
         <item>
+            <title>MacTR 1.3.9</title>
+            <sparkle:version>1.3.9</sparkle:version>
+            <sparkle:shortVersionString>1.3.9</sparkle:shortVersionString>
+            <description><![CDATA[
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #333; padding: 8px; }
+                    h3 { font-size: 14px; margin: 8px 0 4px; }
+                    ul { padding-left: 20px; margin: 4px 0; }
+                    li { margin: 2px 0; }
+                </style>
+                <h3>v1.3.9</h3>
+                <ul>
+                    <li>Swap trend is now an in/out mirror chart (swap out ↑ / swap in ↓) with a center axis — visually consistent with the Network and Disk I/O charts</li>
+                    <li>The center axis stays visible when idle, so a healthy no-swap state reads as "monitored" rather than broken</li>
+                </ul>
+            ]]></description>
+            <pubDate>Sat, 11 Jul 2026 00:00:00 +0900</pubDate>
+            <enclosure
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.9/MacTR-1.3.9.zip"
+                sparkle:edSignature="Dn0nI54dImKBK3u9cTbsW4WMz+39pPE7PzDQjMEib2Z5zRrIgNgrlV7VXJ34oPx3cMJnlfvasHCvbBD9uhqjBQ=="
+                length="1690389"
+                type="application/octet-stream" />
+        </item>
+
+        <item>
             <title>MacTR 1.3.8</title>
             <sparkle:version>1.3.8</sparkle:version>
             <sparkle:shortVersionString>1.3.8</sparkle:shortVersionString>

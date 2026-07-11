@@ -36,7 +36,8 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
     private var netTxHistory: [Double] = []
     private var diskReadHistory: [Double] = []
     private var diskWriteHistory: [Double] = []
-    private var swapActivityHistory: [Double] = []
+    private var swapInHistory: [Double] = []
+    private var swapOutHistory: [Double] = []
 
     private func pushSample(_ buffer: inout [Double], _ value: Double) {
         buffer.append(value)
@@ -127,7 +128,7 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             total: 32 * gb, active: 8 * gb, wired: 4 * gb,
             compressed: 2 * gb, available: 18 * gb,
             swapUsed: 512 * 1024 * 1024, swapTotal: 4 * gb,
-            swapActivityPerSec: 12_000_000,  // ~12 MB/s → red, for visible snapshot
+            swapInPerSec: 5_000_000, swapOutPerSec: 12_000_000,  // → red, visible snapshot
             swapAvailable: true)
         let bat = BatterySnapshot(percent: 85, isCharging: false, isPresent: true)
         let sys = SystemSnapshot(uptimeSeconds: 86400 + 7200 + 1800, processCount: 412)
@@ -145,7 +146,8 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             pushSample(&netTxHistory, Double.random(in: 100_000...800_000))
             pushSample(&diskReadHistory, Double.random(in: 1_000_000...30_000_000))
             pushSample(&diskWriteHistory, Double.random(in: 500_000...15_000_000))
-            pushSample(&swapActivityHistory, Double.random(in: 2_000_000...48_000_000))
+            pushSample(&swapInHistory, Double.random(in: 1_000_000...20_000_000))
+            pushSample(&swapOutHistory, Double.random(in: 2_000_000...40_000_000))
         }
 
         let w = Layout.width, h = Layout.height
@@ -181,7 +183,8 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         pushSample(&netTxHistory, net.txBytesPerSec)
         pushSample(&diskReadHistory, diskIO.readBytesPerSec)
         pushSample(&diskWriteHistory, diskIO.writeBytesPerSec)
-        pushSample(&swapActivityHistory, mem.swapActivityPerSec)
+        pushSample(&swapInHistory, mem.swapInPerSec)
+        pushSample(&swapOutHistory, mem.swapOutPerSec)
 
         // Reuse CGContext to prevent CG raster data memory growth
         let w = Layout.width
@@ -448,8 +451,10 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             ry += 48
         }
 
-        // Swap block — bottom (size + activity rate). Severity color is driven by
-        // ACTIVITY, not size: large-but-idle swap is stable (green); active swapping hurts.
+        // Swap block — bottom. In/out mirror chart (out↑ / in↓) like Network & Disk I/O,
+        // so all three trend blocks share one visual language. The always-drawn center
+        // axis signals "monitored" even when idle; N/A signals a real read failure.
+        // Severity color is driven by total ACTIVITY (not size): parked swap stays green.
         let swapDividerY = py + Layout.panelHeight - 120
         let swapX = x + 16
         let swapW = pw - 32
@@ -458,43 +463,37 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         Draw.text(ctx, "Swap", x: swapX, y: swapDividerY + 4,
                   font: Fonts.system(17, weight: .medium), color: Color.textL)
 
-        let usedY = swapDividerY + 30
-        let actY = usedY + 36
-        let sparkX = swapX + 104
-        let sparkY = actY - 4
-        let sparkH = py + Layout.panelHeight - sparkY - 8
-
-        Draw.text(ctx, "Used", x: swapX, y: usedY,
-                  font: Fonts.system(20), color: Color.textL)
-        let sizeFont = Fonts.system(20, weight: .semibold)
-
         if !mem.swapAvailable {
-            // Monitoring FAILURE — visibly distinct from a healthy idle swap
-            let na = "N/A"
-            let naW = (na as NSString).size(withAttributes: [.font: sizeFont]).width
-            Draw.text(ctx, na, x: Int(CGFloat(swapX + swapW) - naW), y: usedY,
-                      font: sizeFont, color: Color.textD)
-            Draw.text(ctx, "monitoring unavailable", x: swapX, y: actY,
+            // Monitoring FAILURE — visibly distinct from a healthy idle swap (no chart)
+            let naFont = Fonts.system(17, weight: .semibold)
+            let naW = ("N/A" as NSString).size(withAttributes: [.font: naFont]).width
+            Draw.text(ctx, "N/A", x: Int(CGFloat(swapX + swapW) - naW), y: swapDividerY + 4,
+                      font: naFont, color: Color.textD)
+            Draw.text(ctx, "monitoring unavailable", x: swapX, y: swapDividerY + 40,
                       font: Fonts.system(15), color: Color.textD)
         } else {
-            // Used size (right-aligned, white). macOS swap total is dynamic — show used only.
+            // Used size on the header line (right-aligned, white). Total dynamic → show used only.
             let swapUsedG = Double(mem.swapUsed) / (1024 * 1024 * 1024)
+            let sizeFont = Fonts.system(17, weight: .semibold)
             let sizeStr = String(format: "%.1f GB", swapUsedG)
             let sizeW = (sizeStr as NSString).size(withAttributes: [.font: sizeFont]).width
-            Draw.text(ctx, sizeStr, x: Int(CGFloat(swapX + swapW) - sizeW), y: usedY,
+            Draw.text(ctx, sizeStr, x: Int(CGFloat(swapX + swapW) - sizeW), y: swapDividerY + 4,
                       font: sizeFont, color: Color.textW)
 
-            // Severity by ACTIVITY (not size). "idle" affirms monitoring is live at zero.
-            let activity = mem.swapActivityPerSec
-            let isIdle = activity < 256_000
-            let swapColor: CGColor = isIdle ? Color.green
-                : (activity < 10_000_000 ? Color.orange : Color.red)
-            let rateText = isIdle ? "⇅ idle" : "⇅ \(Draw.formatBytesPerSec(activity))"
-            Draw.text(ctx, rateText, x: swapX, y: actY,
-                      font: Fonts.system(16, weight: .semibold), color: swapColor)
-            Draw.sparkline(ctx, values: swapActivityHistory,
-                           x: sparkX, y: sparkY, w: swapX + swapW - sparkX, h: sparkH,
-                           color: swapColor)
+            // Severity color by total activity (in+out)
+            let total = mem.swapInPerSec + mem.swapOutPerSec
+            let swapColor: CGColor = total < 256_000 ? Color.green
+                : (total < 10_000_000 ? Color.orange : Color.red)
+
+            let chartY = swapDividerY + 22
+            let chartH = py + Layout.panelHeight - chartY - 6
+            Draw.mirrorBarChart(ctx,
+                topValues: swapOutHistory, bottomValues: swapInHistory,
+                x: swapX, y: chartY, w: swapW, h: chartH,
+                topColor: swapColor, bottomColor: swapColor,
+                topLabel: "out", bottomLabel: "in",
+                topCurrent: Draw.formatBytesPerSec(mem.swapOutPerSec),
+                bottomCurrent: Draw.formatBytesPerSec(mem.swapInPerSec))
         }
     }
 

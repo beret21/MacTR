@@ -26,7 +26,8 @@ struct MemorySnapshot: Sendable {
     let available: UInt64
     let swapUsed: UInt64
     let swapTotal: UInt64
-    let swapActivityPerSec: Double  // bytes/sec (swapins+swapouts × pageSize)
+    let swapInPerSec: Double        // bytes/sec — pages read FROM swap (disk→memory)
+    let swapOutPerSec: Double       // bytes/sec — pages written TO swap (memory→disk)
     let swapAvailable: Bool         // false = 수집 실패(장애). idle(0)와 구분용
     var percent: Double { Double(total - available) / Double(total) * 100 }
 }
@@ -187,7 +188,7 @@ final class SystemMetricsCollector: @unchecked Sendable {
         guard result == KERN_SUCCESS else {
             return MemorySnapshot(total: 0, active: 0, wired: 0, compressed: 0,
                                   available: 0, swapUsed: 0, swapTotal: 0,
-                                  swapActivityPerSec: 0, swapAvailable: false)
+                                  swapInPerSec: 0, swapOutPerSec: 0, swapAvailable: false)
         }
 
         // Total RAM via sysctl
@@ -211,9 +212,11 @@ final class SystemMetricsCollector: @unchecked Sendable {
 
         // Swap activity — swapins/swapouts are cumulative page counts in the same
         // vm_statistics64 already read above (no extra syscall). Delta × pageSize = bytes/sec.
-        // This is the true performance signal: large-but-idle swap is fine, active swapping hurts.
+        // Tracked separately for the in/out mirror chart. Performance signal is the RATE:
+        // large-but-idle swap is fine, active swapping hurts.
         let now = Date()
-        var swapActivity: Double = 0
+        var swapIn: Double = 0
+        var swapOut: Double = 0
         let curIns = stats.swapins
         let curOuts = stats.swapouts
         if let prevTime = prevSwapTime {
@@ -221,7 +224,8 @@ final class SystemMetricsCollector: @unchecked Sendable {
             if elapsed > 0 && (prevSwapIns > 0 || prevSwapOuts > 0) {
                 let dIns = curIns >= prevSwapIns ? curIns - prevSwapIns : 0
                 let dOuts = curOuts >= prevSwapOuts ? curOuts - prevSwapOuts : 0
-                swapActivity = Double(dIns + dOuts) * Double(pageSize) / elapsed
+                swapIn = Double(dIns) * Double(pageSize) / elapsed
+                swapOut = Double(dOuts) * Double(pageSize) / elapsed
             }
         }
         prevSwapIns = curIns
@@ -233,7 +237,7 @@ final class SystemMetricsCollector: @unchecked Sendable {
             compressed: compressed, available: available,
             swapUsed: UInt64(swapUsage.xsu_used),
             swapTotal: UInt64(swapUsage.xsu_total),
-            swapActivityPerSec: swapActivity,
+            swapInPerSec: swapIn, swapOutPerSec: swapOut,
             swapAvailable: swapRet == 0)
     }
 
