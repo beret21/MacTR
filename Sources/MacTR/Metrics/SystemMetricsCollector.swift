@@ -27,6 +27,7 @@ struct MemorySnapshot: Sendable {
     let swapUsed: UInt64
     let swapTotal: UInt64
     let swapActivityPerSec: Double  // bytes/sec (swapins+swapouts × pageSize)
+    let swapAvailable: Bool         // false = 수집 실패(장애). idle(0)와 구분용
     var percent: Double { Double(total - available) / Double(total) * 100 }
 }
 
@@ -186,7 +187,7 @@ final class SystemMetricsCollector: @unchecked Sendable {
         guard result == KERN_SUCCESS else {
             return MemorySnapshot(total: 0, active: 0, wired: 0, compressed: 0,
                                   available: 0, swapUsed: 0, swapTotal: 0,
-                                  swapActivityPerSec: 0)
+                                  swapActivityPerSec: 0, swapAvailable: false)
         }
 
         // Total RAM via sysctl
@@ -201,10 +202,12 @@ final class SystemMetricsCollector: @unchecked Sendable {
         let inactive = UInt64(stats.inactive_count) * pageSize
         let available = free + inactive
 
-        // Swap size via sysctl (xsu_total is dynamic on macOS — grows on demand)
+        // Swap size via sysctl (xsu_total is dynamic on macOS — grows on demand).
+        // ret == 0 means the read succeeded even when swap is 0 (genuine idle);
+        // a non-zero return means monitoring is unavailable (distinct from idle).
         var swapUsage = xsw_usage()
         var swapSize = MemoryLayout<xsw_usage>.size
-        sysctlbyname("vm.swapusage", &swapUsage, &swapSize, nil, 0)
+        let swapRet = sysctlbyname("vm.swapusage", &swapUsage, &swapSize, nil, 0)
 
         // Swap activity — swapins/swapouts are cumulative page counts in the same
         // vm_statistics64 already read above (no extra syscall). Delta × pageSize = bytes/sec.
@@ -230,7 +233,8 @@ final class SystemMetricsCollector: @unchecked Sendable {
             compressed: compressed, available: available,
             swapUsed: UInt64(swapUsage.xsu_used),
             swapTotal: UInt64(swapUsage.xsu_total),
-            swapActivityPerSec: swapActivity)
+            swapActivityPerSec: swapActivity,
+            swapAvailable: swapRet == 0)
     }
 
     // MARK: - GPU (via ioreg)

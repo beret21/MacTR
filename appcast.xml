@@ -7,6 +7,32 @@
         <language>en</language>
 
         <item>
+            <title>MacTR 1.3.8</title>
+            <sparkle:version>1.3.8</sparkle:version>
+            <sparkle:shortVersionString>1.3.8</sparkle:shortVersionString>
+            <description><![CDATA[
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #333; padding: 8px; }
+                    h3 { font-size: 14px; margin: 8px 0 4px; }
+                    ul { padding-left: 20px; margin: 4px 0; }
+                    li { margin: 2px 0; }
+                    .version { color: #888; font-size: 12px; }
+                </style>
+                <h3>v1.3.8</h3>
+                <ul>
+                    <li>Swap now clearly distinguishes three states: idle (monitored, no activity), active/heavy, and N/A (monitoring unavailable)</li>
+                    <li>Idle swap shows "⇅ idle" with a baseline — no longer looks like a broken widget when there is no swap</li>
+                </ul>
+            ]]></description>
+            <pubDate>Sat, 11 Jul 2026 00:00:00 +0900</pubDate>
+            <enclosure
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.8/MacTR-1.3.8.zip"
+                sparkle:edSignature="NWC2vsLbrikPfR5qVwd0zHEEstj2lT4jqyUYEOhJlk8rv/Nuf5rkLAmjEF9RgxveIPPEnLhDYb4Gkzi2lIDCCw=="
+                length="1690464"
+                type="application/octet-stream" />
+        </item>
+
+        <item>
             <title>MacTR 1.3.7</title>
             <sparkle:version>1.3.7</sparkle:version>
             <sparkle:shortVersionString>1.3.7</sparkle:shortVersionString>

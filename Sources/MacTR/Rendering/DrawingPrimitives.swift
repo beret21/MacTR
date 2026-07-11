@@ -258,13 +258,21 @@ enum Draw {
         ctx.addPath(CGPath(roundedRect: bgRect, cornerWidth: 4, cornerHeight: 4, transform: nil))
         ctx.fillPath()
 
+        let pad: CGFloat = 3
+        let baseY = CGFloat(y + h) - pad
+
+        // Baseline line — signals "monitored, value zero" (distinguishes idle from a dead widget)
+        ctx.setStrokeColor(color.copy(alpha: 0.5) ?? color)
+        ctx.setLineWidth(1)
+        ctx.move(to: CGPoint(x: CGFloat(x) + pad, y: baseY))
+        ctx.addLine(to: CGPoint(x: CGFloat(x + w) - pad, y: baseY))
+        ctx.strokePath()
+
         guard !values.isEmpty else { return }
         let count = values.count
         let barW = max(1, CGFloat(w) / CGFloat(count))
         let maxVal = max(values.max() ?? 1, 1)
-        let pad: CGFloat = 3
         let innerH = CGFloat(h) - pad * 2
-        let baseY = CGFloat(y + h) - pad
 
         for (i, val) in values.enumerated() {
             let bh = CGFloat(val / maxVal) * innerH

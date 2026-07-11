@@ -127,7 +127,8 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             total: 32 * gb, active: 8 * gb, wired: 4 * gb,
             compressed: 2 * gb, available: 18 * gb,
             swapUsed: 512 * 1024 * 1024, swapTotal: 4 * gb,
-            swapActivityPerSec: 12_000_000)  // ~12 MB/s → red, for visible snapshot
+            swapActivityPerSec: 12_000_000,  // ~12 MB/s → red, for visible snapshot
+            swapAvailable: true)
         let bat = BatterySnapshot(percent: 85, isCharging: false, isPresent: true)
         let sys = SystemSnapshot(uptimeSeconds: 86400 + 7200 + 1800, processCount: 412)
         let disk = DiskSnapshot(totalGB: 1000, usedGB: 420, freeGB: 580)
@@ -457,30 +458,44 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         Draw.text(ctx, "Swap", x: swapX, y: swapDividerY + 4,
                   font: Fonts.system(17, weight: .medium), color: Color.textL)
 
-        // Used size (right-aligned, white). macOS swap total is dynamic — show used only.
-        let swapUsedG = Double(mem.swapUsed) / (1024 * 1024 * 1024)
         let usedY = swapDividerY + 30
-        Draw.text(ctx, "Used", x: swapX, y: usedY,
-                  font: Fonts.system(20), color: Color.textL)
-        let sizeFont = Fonts.system(20, weight: .semibold)
-        let sizeStr = String(format: "%.1f GB", swapUsedG)
-        let sizeW = (sizeStr as NSString).size(withAttributes: [.font: sizeFont]).width
-        Draw.text(ctx, sizeStr, x: Int(CGFloat(swapX + swapW) - sizeW), y: usedY,
-                  font: sizeFont, color: Color.textW)
-
-        // Activity rate + sparkline, colored by activity (green idle / orange / red thrashing)
-        let activity = mem.swapActivityPerSec
-        let swapColor: CGColor = activity < 256_000 ? Color.green
-            : (activity < 10_000_000 ? Color.orange : Color.red)
         let actY = usedY + 36
-        Draw.text(ctx, "⇅ \(Draw.formatBytesPerSec(activity))", x: swapX, y: actY,
-                  font: Fonts.system(16, weight: .semibold), color: swapColor)
         let sparkX = swapX + 104
         let sparkY = actY - 4
         let sparkH = py + Layout.panelHeight - sparkY - 8
-        Draw.sparkline(ctx, values: swapActivityHistory,
-                       x: sparkX, y: sparkY, w: swapX + swapW - sparkX, h: sparkH,
-                       color: swapColor)
+
+        Draw.text(ctx, "Used", x: swapX, y: usedY,
+                  font: Fonts.system(20), color: Color.textL)
+        let sizeFont = Fonts.system(20, weight: .semibold)
+
+        if !mem.swapAvailable {
+            // Monitoring FAILURE — visibly distinct from a healthy idle swap
+            let na = "N/A"
+            let naW = (na as NSString).size(withAttributes: [.font: sizeFont]).width
+            Draw.text(ctx, na, x: Int(CGFloat(swapX + swapW) - naW), y: usedY,
+                      font: sizeFont, color: Color.textD)
+            Draw.text(ctx, "monitoring unavailable", x: swapX, y: actY,
+                      font: Fonts.system(15), color: Color.textD)
+        } else {
+            // Used size (right-aligned, white). macOS swap total is dynamic — show used only.
+            let swapUsedG = Double(mem.swapUsed) / (1024 * 1024 * 1024)
+            let sizeStr = String(format: "%.1f GB", swapUsedG)
+            let sizeW = (sizeStr as NSString).size(withAttributes: [.font: sizeFont]).width
+            Draw.text(ctx, sizeStr, x: Int(CGFloat(swapX + swapW) - sizeW), y: usedY,
+                      font: sizeFont, color: Color.textW)
+
+            // Severity by ACTIVITY (not size). "idle" affirms monitoring is live at zero.
+            let activity = mem.swapActivityPerSec
+            let isIdle = activity < 256_000
+            let swapColor: CGColor = isIdle ? Color.green
+                : (activity < 10_000_000 ? Color.orange : Color.red)
+            let rateText = isIdle ? "⇅ idle" : "⇅ \(Draw.formatBytesPerSec(activity))"
+            Draw.text(ctx, rateText, x: swapX, y: actY,
+                      font: Fonts.system(16, weight: .semibold), color: swapColor)
+            Draw.sparkline(ctx, values: swapActivityHistory,
+                           x: sparkX, y: sparkY, w: swapX + swapW - sparkX, h: sparkH,
+                           color: swapColor)
+        }
     }
 
     // MARK: - Disk Panel
