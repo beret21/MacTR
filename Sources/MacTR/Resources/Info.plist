@@ -11,9 +11,9 @@
 	<key>CFBundleName</key>
 	<string>MacTR</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.3.9</string>
+	<string>1.3.10</string>
 	<key>CFBundleVersion</key>
-	<string>1.3.9</string>
+	<string>1.3.10</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>

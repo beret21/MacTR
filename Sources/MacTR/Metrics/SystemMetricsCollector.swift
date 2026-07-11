@@ -29,6 +29,7 @@ struct MemorySnapshot: Sendable {
     let swapInPerSec: Double        // bytes/sec — pages read FROM swap (disk→memory)
     let swapOutPerSec: Double       // bytes/sec — pages written TO swap (memory→disk)
     let swapAvailable: Bool         // false = 수집 실패(장애). idle(0)와 구분용
+    let pressure: Int               // kern.memorystatus_vm_pressure_level: 1=normal 2=warn 4=critical
     var percent: Double { Double(total - available) / Double(total) * 100 }
 }
 
@@ -188,7 +189,8 @@ final class SystemMetricsCollector: @unchecked Sendable {
         guard result == KERN_SUCCESS else {
             return MemorySnapshot(total: 0, active: 0, wired: 0, compressed: 0,
                                   available: 0, swapUsed: 0, swapTotal: 0,
-                                  swapInPerSec: 0, swapOutPerSec: 0, swapAvailable: false)
+                                  swapInPerSec: 0, swapOutPerSec: 0, swapAvailable: false,
+                                  pressure: 1)
         }
 
         // Total RAM via sysctl
@@ -232,13 +234,20 @@ final class SystemMetricsCollector: @unchecked Sendable {
         prevSwapOuts = curOuts
         prevSwapTime = now
 
+        // Memory pressure — macOS' authoritative signal (same source as Activity Monitor's
+        // pressure graph). 1=normal 2=warn 4=critical. This is severity; used% is just the gauge.
+        var pressureLevel: Int32 = 1
+        var pressureSize = MemoryLayout<Int32>.size
+        sysctlbyname("kern.memorystatus_vm_pressure_level", &pressureLevel, &pressureSize, nil, 0)
+
         return MemorySnapshot(
             total: totalRAM, active: active, wired: wired,
             compressed: compressed, available: available,
             swapUsed: UInt64(swapUsage.xsu_used),
             swapTotal: UInt64(swapUsage.xsu_total),
             swapInPerSec: swapIn, swapOutPerSec: swapOut,
-            swapAvailable: swapRet == 0)
+            swapAvailable: swapRet == 0,
+            pressure: Int(pressureLevel))
     }
 
     // MARK: - GPU (via ioreg)

@@ -44,6 +44,16 @@ enum Color {
     static func forPercentDark(_ pct: Double) -> CGColor {
         pct < 50 ? greenD : (pct < 75 ? orangeD : redD)
     }
+
+    /// Color by macOS memory pressure level (1=normal, 2=warn, 4=critical).
+    /// Severity comes from pressure, not from used% — a Mac using RAM as cache is not "in danger".
+    static func forPressure(_ level: Int) -> CGColor {
+        level >= 4 ? red : (level >= 2 ? orange : green)
+    }
+
+    static func forPressureDark(_ level: Int) -> CGColor {
+        level >= 4 ? redD : (level >= 2 ? orangeD : greenD)
+    }
 }
 
 // MARK: - Layout

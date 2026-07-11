@@ -87,6 +87,7 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
     private func metricsLoop() {
         log("[Metrics] Loop started on metricsQueue")
         var slowTick = 0
+        var diskTick = 0
         while metricsRunning {
             // Fast metrics every tick
             let cpu = collector.collectCPU()
@@ -97,18 +98,28 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             _cpu = cpu; _mem = mem; _bat = bat; _sys = sys
             lock.unlock()
 
-            // Slow metrics every 4th tick (~2s)
+            // Slow metrics every 4th tick (~2s). net/diskIO are rates → need a steady interval.
             slowTick += 1
             if slowTick >= 4 {
                 let gpu = collector.collectGPU()
-                let disk = collector.collectDisk()
                 let net = collector.collectNetwork()
                 let diskIO = collector.collectDiskIO()
                 let temp = collector.collectTemperature()
                 lock.lock()
-                _gpu = gpu; _disk = disk; _net = net; _diskIO = diskIO; _temp = temp
+                _gpu = gpu; _net = net; _diskIO = diskIO; _temp = temp
                 lock.unlock()
                 slowTick = 0
+            }
+
+            // Disk capacity — changes slowly; poll every ~30s to keep the diskutil
+            // subprocess off the hot path (cheap-observation-always, heavy-work-rarely).
+            diskTick += 1
+            if diskTick >= 60 {
+                let disk = collector.collectDisk()
+                lock.lock()
+                _disk = disk
+                lock.unlock()
+                diskTick = 0
             }
 
             Thread.sleep(forTimeInterval: 0.5)
@@ -129,7 +140,7 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             compressed: 2 * gb, available: 18 * gb,
             swapUsed: 512 * 1024 * 1024, swapTotal: 4 * gb,
             swapInPerSec: 5_000_000, swapOutPerSec: 12_000_000,  // → red, visible snapshot
-            swapAvailable: true)
+            swapAvailable: true, pressure: 1)
         let bat = BatterySnapshot(percent: 85, isCharging: false, isPresent: true)
         let sys = SystemSnapshot(uptimeSeconds: 86400 + 7200 + 1800, processCount: 412)
         let disk = DiskSnapshot(totalGB: 1000, usedGB: 420, freeGB: 580)
@@ -410,12 +421,13 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         Draw.text(ctx, String(format: "%.0f GB", totalGB), x: x + pw - 75, y: py + 16,
                   font: Fonts.system(18), color: Color.textD)
 
-        // Arc gauge
+        // Arc gauge — length = used% (utilization gauge), COLOR = macOS memory pressure.
+        // A Mac using RAM as cache (high used%, low pressure) is healthy → stays green.
         let gcx = x + 100, gcy = py + 138
         Draw.arcGauge(ctx, cx: gcx, cy: gcy, radius: 70,
                       percent: pct,
-                      color: Color.forPercent(pct),
-                      colorDark: Color.forPercentDark(pct), thickness: 13)
+                      color: Color.forPressure(mem.pressure),
+                      colorDark: Color.forPressureDark(mem.pressure), thickness: 13)
         Draw.centeredText(ctx, String(format: "%.0f", pct), cx: gcx, y: gcy - 28,
                           font: Fonts.system(50, weight: .bold), color: Color.textW)
         Draw.centeredText(ctx, "%", cx: gcx, y: gcy + 24,
