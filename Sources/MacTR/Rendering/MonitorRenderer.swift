@@ -36,6 +36,7 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
     private var netTxHistory: [Double] = []
     private var diskReadHistory: [Double] = []
     private var diskWriteHistory: [Double] = []
+    private var swapActivityHistory: [Double] = []
 
     private func pushSample(_ buffer: inout [Double], _ value: Double) {
         buffer.append(value)
@@ -125,7 +126,8 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         let mem = MemorySnapshot(
             total: 32 * gb, active: 8 * gb, wired: 4 * gb,
             compressed: 2 * gb, available: 18 * gb,
-            swapUsed: 512 * 1024 * 1024, swapTotal: 4 * gb)
+            swapUsed: 512 * 1024 * 1024, swapTotal: 4 * gb,
+            swapActivityPerSec: 12_000_000)  // ~12 MB/s → red, for visible snapshot
         let bat = BatterySnapshot(percent: 85, isCharging: false, isPresent: true)
         let sys = SystemSnapshot(uptimeSeconds: 86400 + 7200 + 1800, processCount: 412)
         let disk = DiskSnapshot(totalGB: 1000, usedGB: 420, freeGB: 580)
@@ -142,6 +144,7 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             pushSample(&netTxHistory, Double.random(in: 100_000...800_000))
             pushSample(&diskReadHistory, Double.random(in: 1_000_000...30_000_000))
             pushSample(&diskWriteHistory, Double.random(in: 500_000...15_000_000))
+            pushSample(&swapActivityHistory, Double.random(in: 2_000_000...48_000_000))
         }
 
         let w = Layout.width, h = Layout.height
@@ -153,8 +156,8 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         ctx.translateBy(x: 0, y: CGFloat(h)); ctx.scaleBy(x: 1, y: -1)
         Draw.gradientBackground(ctx)
         renderCPU(ctx, cpu: cpu, temp: temp)
-        renderGPU(ctx, gpu: gpu, temp: temp)
-        renderMemory(ctx, mem: mem, net: net)
+        renderGPU(ctx, gpu: gpu, temp: temp, net: net)
+        renderMemory(ctx, mem: mem)
         renderDisk(ctx, disk: disk, diskIO: diskIO)
         renderSystem(ctx, bat: bat, sys: sys)
         return ctx.makeImage()
@@ -177,6 +180,7 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         pushSample(&netTxHistory, net.txBytesPerSec)
         pushSample(&diskReadHistory, diskIO.readBytesPerSec)
         pushSample(&diskWriteHistory, diskIO.writeBytesPerSec)
+        pushSample(&swapActivityHistory, mem.swapActivityPerSec)
 
         // Reuse CGContext to prevent CG raster data memory growth
         let w = Layout.width
@@ -201,8 +205,8 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
 
         // Panels
         renderCPU(ctx, cpu: cpu, temp: temp)
-        renderGPU(ctx, gpu: gpu, temp: temp)
-        renderMemory(ctx, mem: mem, net: net)
+        renderGPU(ctx, gpu: gpu, temp: temp, net: net)
+        renderMemory(ctx, mem: mem)
         renderDisk(ctx, disk: disk, diskIO: diskIO)
         renderSystem(ctx, bat: bat, sys: sys)
 
@@ -297,7 +301,8 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
 
     // MARK: - GPU Panel
 
-    private func renderGPU(_ ctx: CGContext, gpu: GPUSnapshot, temp: TemperatureSnapshot) {
+    private func renderGPU(_ ctx: CGContext, gpu: GPUSnapshot, temp: TemperatureSnapshot,
+                           net: NetworkSnapshot) {
         let x = Layout.panelX(1)
         let pw = Layout.panelWidth
         let py = Layout.panelY
@@ -344,35 +349,50 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             ry += 48
         }
 
-        // Memory section
-        ry += 4
-        Draw.line(ctx, from: CGPoint(x: rx, y: ry),
-                  to: CGPoint(x: rx + rw, y: ry),
-                  color: Color.border)
-        ry += 12
-        Draw.text(ctx, "Memory", x: rx, y: ry,
-                  font: Fonts.system(18), color: Color.textL)
-        ry += 28
-        Draw.text(ctx, "In Use", x: rx, y: ry,
-                  font: Fonts.system(19), color: Color.textL)
-        Draw.text(ctx, "\(gpu.memUsedMB) MB", x: rx + rw - 70, y: ry,
-                  font: Fonts.system(19), color: Color.textS)
+        // GPU Memory — full-width single line: "GPU Memory   {used} / {alloc} MB"
+        // (unified memory share used by the GPU; In Use bold-white, Allocated dim)
+        let gmX = x + 16
+        let gmW = pw - 32
+        let gmY = py + 244
+        Draw.text(ctx, "GPU Memory", x: gmX, y: gmY,
+                  font: Fonts.system(20), color: Color.textL)
+        let usedFont = Fonts.system(19, weight: .semibold)
+        let allocFont = Fonts.system(19)
+        let usedPart = "\(gpu.memUsedMB)"
+        let allocPart = " / \(gpu.memAllocMB) MB"
+        let usedW = (usedPart as NSString).size(withAttributes: [.font: usedFont]).width
+        let allocW = (allocPart as NSString).size(withAttributes: [.font: allocFont]).width
+        let rightEdge = CGFloat(gmX + gmW)
+        Draw.text(ctx, usedPart, x: Int(rightEdge - allocW - usedW), y: gmY,
+                  font: usedFont, color: Color.textW)
+        Draw.text(ctx, allocPart, x: Int(rightEdge - allocW), y: gmY,
+                  font: allocFont, color: Color.textD)
         if gpu.memAllocMB > 0 {
-            Draw.bar(ctx, x: rx, y: ry + 24, w: rw, h: 10,
+            Draw.bar(ctx, x: gmX, y: gmY + 30, w: gmW, h: 11,
                      percent: Double(gpu.memUsedMB) / Double(gpu.memAllocMB) * 100,
                      color: Color.magenta)
         }
-        ry += 48
-        Draw.text(ctx, "Allocated", x: rx, y: ry,
-                  font: Fonts.system(19), color: Color.textL)
-        Draw.text(ctx, "\(gpu.memAllocMB) MB", x: rx + rw - 70, y: ry,
-                  font: Fonts.system(19), color: Color.textD)
 
+        // Network mirror bar chart — bottom (moved here from the Memory panel)
+        let netDividerY = py + Layout.panelHeight - 120
+        let netChartY = netDividerY + 22
+        let netChartH = py + Layout.panelHeight - netChartY - 6
+        Draw.line(ctx, from: CGPoint(x: x + 16, y: netDividerY),
+                  to: CGPoint(x: x + pw - 16, y: netDividerY), color: Color.border)
+        Draw.text(ctx, "Network", x: x + 16, y: netDividerY + 4,
+                  font: Fonts.system(17, weight: .medium), color: Color.textL)
+        Draw.mirrorBarChart(ctx,
+            topValues: netRxHistory, bottomValues: netTxHistory,
+            x: x + 16, y: netChartY, w: pw - 32, h: netChartH,
+            topColor: Color.cyan, bottomColor: Color.orange,
+            topLabel: "↓", bottomLabel: "↑",
+            topCurrent: Draw.formatBytesPerSec(net.rxBytesPerSec),
+            bottomCurrent: Draw.formatBytesPerSec(net.txBytesPerSec))
     }
 
     // MARK: - Memory Panel
 
-    private func renderMemory(_ ctx: CGContext, mem: MemorySnapshot, net: NetworkSnapshot) {
+    private func renderMemory(_ ctx: CGContext, mem: MemorySnapshot) {
         let x = Layout.panelX(2)
         let pw = Layout.panelWidth
         let py = Layout.panelY
@@ -427,39 +447,40 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             ry += 48
         }
 
-        // Swap
-        ry += 4
-        Draw.line(ctx, from: CGPoint(x: rx, y: ry),
-                  to: CGPoint(x: rx + rw, y: ry),
-                  color: Color.border)
-        ry += 12
-        let swapUsedG = Double(mem.swapUsed) / (1024 * 1024 * 1024)
-        let swapTotalG = Double(mem.swapTotal) / (1024 * 1024 * 1024)
-        Draw.text(ctx, "Swap", x: rx, y: ry,
-                  font: Fonts.system(19), color: Color.textL)
-        let swapText = swapTotalG > 0
-            ? String(format: "%.1f / %.0f G", swapUsedG, swapTotalG)
-            : "0 G"
-        Draw.text(ctx, swapText, x: rx + rw - 90, y: ry,
-                  font: Fonts.system(19), color: Color.textD)
-
-        // Network mirror bar chart — same divider/chart size as Disk I/O
-        // Shared constants: dividerY at panelBottom - 120, chart 18px below, 90px tall
-        let netDividerY = py + Layout.panelHeight - 120
-        let netChartY = netDividerY + 22  // label(18) + gap(4)
-        let netChartH = py + Layout.panelHeight - netChartY - 6
-
-        Draw.line(ctx, from: CGPoint(x: x + 16, y: netDividerY),
-                  to: CGPoint(x: x + pw - 16, y: netDividerY), color: Color.border)
-        Draw.text(ctx, "Network", x: x + 16, y: netDividerY + 4,
+        // Swap block — bottom (size + activity rate). Severity color is driven by
+        // ACTIVITY, not size: large-but-idle swap is stable (green); active swapping hurts.
+        let swapDividerY = py + Layout.panelHeight - 120
+        let swapX = x + 16
+        let swapW = pw - 32
+        Draw.line(ctx, from: CGPoint(x: swapX, y: swapDividerY),
+                  to: CGPoint(x: swapX + swapW, y: swapDividerY), color: Color.border)
+        Draw.text(ctx, "Swap", x: swapX, y: swapDividerY + 4,
                   font: Fonts.system(17, weight: .medium), color: Color.textL)
-        Draw.mirrorBarChart(ctx,
-            topValues: netRxHistory, bottomValues: netTxHistory,
-            x: x + 16, y: netChartY, w: pw - 32, h: netChartH,
-            topColor: Color.cyan, bottomColor: Color.orange,
-            topLabel: "↓", bottomLabel: "↑",
-            topCurrent: Draw.formatBytesPerSec(net.rxBytesPerSec),
-            bottomCurrent: Draw.formatBytesPerSec(net.txBytesPerSec))
+
+        // Used size (right-aligned, white). macOS swap total is dynamic — show used only.
+        let swapUsedG = Double(mem.swapUsed) / (1024 * 1024 * 1024)
+        let usedY = swapDividerY + 30
+        Draw.text(ctx, "Used", x: swapX, y: usedY,
+                  font: Fonts.system(20), color: Color.textL)
+        let sizeFont = Fonts.system(20, weight: .semibold)
+        let sizeStr = String(format: "%.1f GB", swapUsedG)
+        let sizeW = (sizeStr as NSString).size(withAttributes: [.font: sizeFont]).width
+        Draw.text(ctx, sizeStr, x: Int(CGFloat(swapX + swapW) - sizeW), y: usedY,
+                  font: sizeFont, color: Color.textW)
+
+        // Activity rate + sparkline, colored by activity (green idle / orange / red thrashing)
+        let activity = mem.swapActivityPerSec
+        let swapColor: CGColor = activity < 256_000 ? Color.green
+            : (activity < 10_000_000 ? Color.orange : Color.red)
+        let actY = usedY + 36
+        Draw.text(ctx, "⇅ \(Draw.formatBytesPerSec(activity))", x: swapX, y: actY,
+                  font: Fonts.system(16, weight: .semibold), color: swapColor)
+        let sparkX = swapX + 104
+        let sparkY = actY - 4
+        let sparkH = py + Layout.panelHeight - sparkY - 8
+        Draw.sparkline(ctx, values: swapActivityHistory,
+                       x: sparkX, y: sparkY, w: swapX + swapW - sparkX, h: sparkH,
+                       color: swapColor)
     }
 
     // MARK: - Disk Panel

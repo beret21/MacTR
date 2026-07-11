@@ -26,6 +26,7 @@ struct MemorySnapshot: Sendable {
     let available: UInt64
     let swapUsed: UInt64
     let swapTotal: UInt64
+    let swapActivityPerSec: Double  // bytes/sec (swapins+swapouts × pageSize)
     var percent: Double { Double(total - available) / Double(total) * 100 }
 }
 
@@ -89,6 +90,11 @@ final class SystemMetricsCollector: @unchecked Sendable {
     private var prevDiskRead: UInt64 = 0
     private var prevDiskWrite: UInt64 = 0
     private var prevDiskTime: Date?
+
+    // Previous swap counters for activity rate calculation
+    private var prevSwapIns: UInt64 = 0
+    private var prevSwapOuts: UInt64 = 0
+    private var prevSwapTime: Date?
 
     // SMC connection for temperature
     private var smcConn: io_connect_t = 0
@@ -179,7 +185,8 @@ final class SystemMetricsCollector: @unchecked Sendable {
 
         guard result == KERN_SUCCESS else {
             return MemorySnapshot(total: 0, active: 0, wired: 0, compressed: 0,
-                                  available: 0, swapUsed: 0, swapTotal: 0)
+                                  available: 0, swapUsed: 0, swapTotal: 0,
+                                  swapActivityPerSec: 0)
         }
 
         // Total RAM via sysctl
@@ -194,16 +201,36 @@ final class SystemMetricsCollector: @unchecked Sendable {
         let inactive = UInt64(stats.inactive_count) * pageSize
         let available = free + inactive
 
-        // Swap via sysctl
+        // Swap size via sysctl (xsu_total is dynamic on macOS — grows on demand)
         var swapUsage = xsw_usage()
         var swapSize = MemoryLayout<xsw_usage>.size
         sysctlbyname("vm.swapusage", &swapUsage, &swapSize, nil, 0)
+
+        // Swap activity — swapins/swapouts are cumulative page counts in the same
+        // vm_statistics64 already read above (no extra syscall). Delta × pageSize = bytes/sec.
+        // This is the true performance signal: large-but-idle swap is fine, active swapping hurts.
+        let now = Date()
+        var swapActivity: Double = 0
+        let curIns = stats.swapins
+        let curOuts = stats.swapouts
+        if let prevTime = prevSwapTime {
+            let elapsed = now.timeIntervalSince(prevTime)
+            if elapsed > 0 && (prevSwapIns > 0 || prevSwapOuts > 0) {
+                let dIns = curIns >= prevSwapIns ? curIns - prevSwapIns : 0
+                let dOuts = curOuts >= prevSwapOuts ? curOuts - prevSwapOuts : 0
+                swapActivity = Double(dIns + dOuts) * Double(pageSize) / elapsed
+            }
+        }
+        prevSwapIns = curIns
+        prevSwapOuts = curOuts
+        prevSwapTime = now
 
         return MemorySnapshot(
             total: totalRAM, active: active, wired: wired,
             compressed: compressed, available: available,
             swapUsed: UInt64(swapUsage.xsu_used),
-            swapTotal: UInt64(swapUsage.xsu_total))
+            swapTotal: UInt64(swapUsage.xsu_total),
+            swapActivityPerSec: swapActivity)
     }
 
     // MARK: - GPU (via ioreg)

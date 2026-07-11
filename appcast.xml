@@ -7,6 +7,33 @@
         <language>en</language>
 
         <item>
+            <title>MacTR 1.3.7</title>
+            <sparkle:version>1.3.7</sparkle:version>
+            <sparkle:shortVersionString>1.3.7</sparkle:shortVersionString>
+            <description><![CDATA[
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #333; padding: 8px; }
+                    h3 { font-size: 14px; margin: 8px 0 4px; }
+                    ul { padding-left: 20px; margin: 4px 0; }
+                    li { margin: 2px 0; }
+                    .version { color: #888; font-size: 12px; }
+                </style>
+                <h3>v1.3.7</h3>
+                <ul>
+                    <li>Add Swap monitoring to the Memory panel — used size + swap in/out activity rate</li>
+                    <li>Swap severity is color-coded by activity, not size: large-but-idle swap stays green, active swapping turns orange/red</li>
+                    <li>Move the Network chart to the GPU panel; clarify GPU memory as "GPU Memory" (In Use / Allocated)</li>
+                </ul>
+            ]]></description>
+            <pubDate>Sat, 11 Jul 2026 00:00:00 +0900</pubDate>
+            <enclosure
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.7/MacTR-1.3.7.zip"
+                sparkle:edSignature="a0QScqh6IMNtCaVGu5U5q182W7cehpFoJvo7gF2I/EDWiFOoMGpeRCD1/l3KdI9d8QhjIZND5Vgyc4BdEpfCAw=="
+                length="1689742"
+                type="application/octet-stream" />
+        </item>
+
+        <item>
             <title>MacTR 1.3.6</title>
             <sparkle:version>1.3.6</sparkle:version>
             <sparkle:shortVersionString>1.3.6</sparkle:shortVersionString>
