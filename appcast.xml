@@ -7,6 +7,32 @@
         <language>en</language>
 
         <item>
+            <title>MacTR 1.3.11</title>
+            <sparkle:version>1.3.11</sparkle:version>
+            <sparkle:shortVersionString>1.3.11</sparkle:shortVersionString>
+            <description><![CDATA[
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #333; padding: 8px; }
+                    h3 { font-size: 14px; margin: 8px 0 4px; }
+                    ul { padding-left: 20px; margin: 4px 0; }
+                    li { margin: 2px 0; }
+                </style>
+                <h3>v1.3.11</h3>
+                <ul>
+                    <li>Fix disk free/used reporting — free space now includes purgeable space (caches, snapshots, evictable cloud files) exactly as Finder reports it, instead of falsely showing a nearly-full disk</li>
+                    <li>Disk capacity now uses Apple's documented volume API and reports decimal GB, matching Finder</li>
+                    <li>Removed the diskutil subprocess entirely — disk stats are now a cheap native call</li>
+                </ul>
+            ]]></description>
+            <pubDate>Fri, 17 Jul 2026 00:00:00 +0900</pubDate>
+            <enclosure
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.11/MacTR-1.3.11.zip"
+                sparkle:edSignature="KUl4k5vsWpAmr4ZM4/Hw8nsXA8Z3/FT0jA+6d4nY/zBT5aEQBYc4ACJzCh4my1WGhtEZpj2237vHTGr0gRVMCw=="
+                length="1689676"
+                type="application/octet-stream" />
+        </item>
+
+        <item>
             <title>MacTR 1.3.10</title>
             <sparkle:version>1.3.10</sparkle:version>
             <sparkle:shortVersionString>1.3.10</sparkle:shortVersionString>

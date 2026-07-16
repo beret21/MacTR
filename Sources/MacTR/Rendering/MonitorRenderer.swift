@@ -87,7 +87,6 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
     private func metricsLoop() {
         log("[Metrics] Loop started on metricsQueue")
         var slowTick = 0
-        var diskTick = 0
         while metricsRunning {
             // Fast metrics every tick
             let cpu = collector.collectCPU()
@@ -102,24 +101,14 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             slowTick += 1
             if slowTick >= 4 {
                 let gpu = collector.collectGPU()
+                let disk = collector.collectDisk()
                 let net = collector.collectNetwork()
                 let diskIO = collector.collectDiskIO()
                 let temp = collector.collectTemperature()
                 lock.lock()
-                _gpu = gpu; _net = net; _diskIO = diskIO; _temp = temp
+                _gpu = gpu; _disk = disk; _net = net; _diskIO = diskIO; _temp = temp
                 lock.unlock()
                 slowTick = 0
-            }
-
-            // Disk capacity — changes slowly; poll every ~30s to keep the diskutil
-            // subprocess off the hot path (cheap-observation-always, heavy-work-rarely).
-            diskTick += 1
-            if diskTick >= 60 {
-                let disk = collector.collectDisk()
-                lock.lock()
-                _disk = disk
-                lock.unlock()
-                diskTick = 0
             }
 
             Thread.sleep(forTimeInterval: 0.5)

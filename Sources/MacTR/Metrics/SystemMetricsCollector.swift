@@ -299,13 +299,32 @@ final class SystemMetricsCollector: @unchecked Sendable {
         return result
     }
 
-    // MARK: - Disk (APFS container via diskutil)
+    // MARK: - Disk (URLResourceValues — Apple's documented volume capacity API)
 
+    /// Disk capacity via URLResourceValues. Uses `volumeAvailableCapacityForImportantUsage`,
+    /// which is the value Finder shows: it INCLUDES purgeable space (caches, local snapshots,
+    /// evictable cloud files) that macOS reclaims on demand. Counting only non-purgeable free
+    /// space falsely reports a nearly-full disk — the same "ignore what the OS can reclaim"
+    /// mistake as judging memory by used% instead of pressure.
+    /// Units are decimal GB (1e9) to match Finder/Apple conventions.
+    /// No subprocess: replaces the old `diskutil apfs list` shell-out entirely.
     func collectDisk() -> DiskSnapshot {
-        // Try APFS container first
-        if let apfs = apfsContainerUsage() { return apfs }
+        let url = URL(fileURLWithPath: "/")
+        let keys: Set<URLResourceKey> = [
+            .volumeTotalCapacityKey,
+            .volumeAvailableCapacityForImportantUsageKey,
+        ]
+        if let v = try? url.resourceValues(forKeys: keys),
+           let total = v.volumeTotalCapacity,
+           let important = v.volumeAvailableCapacityForImportantUsage {
+            let totalGB = Double(total) / 1e9
+            let freeGB = Double(important) / 1e9
+            return DiskSnapshot(totalGB: totalGB,
+                                usedGB: max(totalGB - freeGB, 0),
+                                freeGB: freeGB)
+        }
 
-        // Fallback: statvfs
+        // Fallback: statvfs (excludes purgeable, so it under-reports free space)
         var stat = statvfs()
         guard statvfs("/", &stat) == 0 else {
             return DiskSnapshot(totalGB: 0, usedGB: 0, freeGB: 0)
@@ -313,52 +332,6 @@ final class SystemMetricsCollector: @unchecked Sendable {
         let total = Double(stat.f_blocks) * Double(stat.f_frsize) / 1e9
         let free = Double(stat.f_bavail) * Double(stat.f_frsize) / 1e9
         return DiskSnapshot(totalGB: total, usedGB: total - free, freeGB: free)
-    }
-
-    private func apfsContainerUsage() -> DiskSnapshot? {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
-        proc.arguments = ["apfs", "list"]
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = FileHandle.nullDevice
-
-        do {
-            try proc.run()
-        } catch { return nil }
-
-        // Wait with timeout to prevent hanging the metrics queue
-        let done = DispatchSemaphore(value: 0)
-        DispatchQueue.global().async {
-            proc.waitUntilExit()
-            done.signal()
-        }
-        if done.wait(timeout: .now() + 5) == .timedOut {
-            proc.terminate()
-            return nil
-        }
-
-        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-
-        // Parse: "Size (Capacity Ceiling):      994662584320 B"
-        // Parse: "Capacity In Use By Volumes:   627354714112 B"
-        guard let capMatch = output.range(of: #"Size \(Capacity Ceiling\):\s+([\d,]+)\s+B"#,
-                                           options: .regularExpression),
-              let usedMatch = output.range(of: #"Capacity In Use By Volumes:\s+([\d,]+)\s+B"#,
-                                            options: .regularExpression)
-        else { return nil }
-
-        let capStr = String(output[capMatch])
-            .replacingOccurrences(of: #"[^\d]"#, with: "", options: .regularExpression)
-        let usedStr = String(output[usedMatch])
-            .replacingOccurrences(of: #"[^\d]"#, with: "", options: .regularExpression)
-
-        guard let totalB = Double(capStr), let usedB = Double(usedStr) else { return nil }
-
-        let totalGB = totalB / (1024 * 1024 * 1024)
-        let usedGB = usedB / (1024 * 1024 * 1024)
-
-        return DiskSnapshot(totalGB: totalGB, usedGB: usedGB, freeGB: totalGB - usedGB)
     }
 
     // MARK: - Battery
