@@ -7,6 +7,33 @@
         <language>en</language>
 
         <item>
+            <title>MacTR 1.3.14</title>
+            <sparkle:version>1.3.14</sparkle:version>
+            <sparkle:shortVersionString>1.3.14</sparkle:shortVersionString>
+            <description><![CDATA[
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #333; padding: 8px; }
+                    h3 { font-size: 14px; margin: 8px 0 4px; }
+                    ul { padding-left: 20px; margin: 4px 0; }
+                    li { margin: 2px 0; }
+                </style>
+                <h3>v1.3.14 — fixes "Update Error!"</h3>
+                <ul>
+                    <li><b>Repairs the bundled Sparkle framework.</b> Two symlinks (Updater.app, XPCServices) were missing from the 1.3.12 and 1.3.13 builds, so the updater could not be launched and every update ended in "An error occurred while launching the installer".</li>
+                    <li>The build script now verifies the framework's symlink structure and refuses to package a broken one.</li>
+                    <li>Includes everything from 1.3.13 (chronic CPU load detection, watchlist, alerts, history log).</li>
+                </ul>
+                <p><b>Note:</b> if you are on 1.3.12 or 1.3.13, the update will fail because the installed app's own updater is the broken part. Install this version once by hand and automatic updates will work again afterwards.</p>
+            ]]></description>
+            <pubDate>Sun, 02 Aug 2026 21:00:00 +0900</pubDate>
+            <enclosure
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.14/MacTR-1.3.14.zip"
+                sparkle:edSignature="p2MuKg2/IokjWlgMMJdhFPDplPDnUliHF9Jmz94yJUJr/nrwsTnTp7/RRCeokkLJXLGcgZzWJkmkjcjgh8kZDg=="
+                length="1794156"
+                type="application/octet-stream" />
+        </item>
+
+        <item>
             <title>MacTR 1.3.13</title>
             <sparkle:version>1.3.13</sparkle:version>
             <sparkle:shortVersionString>1.3.13</sparkle:shortVersionString>
