@@ -53,6 +53,10 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         metricsRunning = true
         lock.unlock()
         log("[Metrics] Starting collection...")
+        // Open the log and reclaim old sessions once, at startup (§4.5 rule 5) —
+        // the steady-state loop must never walk the filesystem.
+        MetricsLogger.shared.start()
+        LogRetention.runStartupMaintenance()
         // First pass: prime CPU ticks (deltas will be zero)
         let cpu0 = collector.collectCPU()
         let mem = collector.collectMemory()
@@ -87,6 +91,7 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
     private func metricsLoop() {
         log("[Metrics] Loop started on metricsQueue")
         var slowTick = 0
+        var diagTick = 600   // scan immediately on first pass — existing filings are evidence
         while metricsRunning {
             // Fast metrics every tick
             let cpu = collector.collectCPU()
@@ -96,6 +101,11 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             lock.lock()
             _cpu = cpu; _mem = mem; _bat = bat; _sys = sys
             lock.unlock()
+
+            // §4.4/§4.6 — history and watchlist run on the metrics queue, never on the
+            // 0.5s USB render path. Both are counter/state updates plus an append.
+            MetricsLogger.shared.record(cpu: cpu, mem: mem, temp: _temp)
+            Watchlist.shared.observe(cpu: cpu)
 
             // Slow metrics every 4th tick (~2s). net/diskIO are rates → need a steady interval.
             slowTick += 1
@@ -108,7 +118,16 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
                 lock.lock()
                 _gpu = gpu; _disk = disk; _net = net; _diskIO = diskIO; _temp = temp
                 lock.unlock()
+                Watchlist.shared.observeProcesses()
                 slowTick = 0
+            }
+
+            // macOS' own CPU-limit filings — cheap directory listing, checked every
+            // ~5 min. This is pre-adjudicated evidence, so it needs no thresholds.
+            diagTick += 1
+            if diagTick >= 600 {
+                Watchlist.shared.scanDiagnosticReports()
+                diagTick = 0
             }
 
             Thread.sleep(forTimeInterval: 0.5)
@@ -119,10 +138,19 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
     /// Render with fully simulated data (for screenshots — no real system info)
     func renderSimulated(coreCount: Int) -> CGImage? {
         let fakeCores = (0..<coreCount).map { _ in Double.random(in: 5...95) }
+        let simPCount = max(coreCount - 2, coreCount * 3 / 4)
+        let simECount = max(coreCount - simPCount, 0)
+        let simESlice = fakeCores.prefix(simECount)
+        let simPSlice = fakeCores.dropFirst(simECount)
         let cpu = CPUSnapshot(perCore: fakeCores,
                               total: fakeCores.reduce(0, +) / Double(coreCount),
                               loadAvg: (3.5, 4.2, 3.8),
-                              pCoreCount: max(coreCount - 2, coreCount * 3 / 4))
+                              pCoreCount: simPCount,
+                              maxCore: fakeCores.max() ?? 0,
+                              saturatedCount: fakeCores.filter { $0 >= CPUThresholds.saturated }.count,
+                              pCoreAvg: simPSlice.isEmpty ? 0 : simPSlice.reduce(0, +) / Double(simPSlice.count),
+                              eCoreAvg: simESlice.isEmpty ? 0 : simESlice.reduce(0, +) / Double(simESlice.count),
+                              coreHighLoadSince: [:])
         let gb: UInt64 = 1024 * 1024 * 1024
         let mem = MemorySnapshot(
             total: 32 * gb, active: 8 * gb, wired: 4 * gb,
@@ -231,10 +259,14 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         Draw.text(ctx, "CPU", x: x + 20, y: py + 14, font: Fonts.system(24, weight: .bold), color: Color.blue)
         // Arc gauge
         let gcx = x + 100, gcy = py + 138
+        // Arc length = mean (utilization gauge), COLOR = distribution-based severity.
+        // The mean alone cannot express saturation: 2 of 10 cores pegged moves it by
+        // at most 20pp, so a mean-colored arc stays green through a chronic stall (§2-B).
+        let cpuSev = cpu.severity()
         Draw.arcGauge(ctx, cx: gcx, cy: gcy, radius: 70,
                       percent: cpu.total,
-                      color: Color.forPercent(cpu.total),
-                      colorDark: Color.forPercentDark(cpu.total), thickness: 13)
+                      color: Color.forSeverity(cpuSev),
+                      colorDark: Color.forSeverityDark(cpuSev), thickness: 13)
         Draw.centeredText(ctx, String(format: "%.0f", cpu.total),
                           cx: gcx, y: gcy - 28,
                           font: Fonts.system(50, weight: .bold), color: Color.textW)
@@ -279,15 +311,31 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             let label = isECore ? "E\(row + 1)" : "P\(row - eCoreCount + 1)"
 
             let pct = coreIndex < cpu.perCore.count ? cpu.perCore[coreIndex] : 0
-            let barColor = isECore ? Color.cyan : Color.forPercent(pct)
+
+            // Severity color applies to EVERY core, E-cores included. Excluding E-cores
+            // from the color scale hid this exact failure: two E-cores sat at 80%+ for
+            // 8 days showing a calm cyan bar (§2-A). E-cores are identified by the
+            // label, not by opting them out of the alert scale.
+            let barColor = Color.forPercent(pct)
 
             Draw.text(ctx, label, x: barX, y: by,
                       font: Fonts.system(fontSize), color: isECore ? Color.cyan : Color.textD)
-            Draw.bar(ctx, x: barX + 28, y: by + 4, w: barW - 78, h: barH,
+            Draw.bar(ctx, x: barX + 28, y: by + 4, w: barW - 104, h: barH,
                      percent: pct, color: barColor)
             Draw.text(ctx, String(format: "%.0f%%", pct),
-                      x: barX + barW - 46, y: by,
+                      x: barX + barW - 72, y: by,
                       font: Fonts.system(fontSize), color: Color.textS)
+
+            // §4.3 — how long this core has been saturated. "82%" alone reads the same
+            // at 8 seconds and 8 days; the duration is what separates a benign spike
+            // from chronic load, and it is what the user needed in order not to wait.
+            if let dur = cpu.highLoadDuration(coreIndex) {
+                let chronic = dur >= CPUThresholds.chronic
+                Draw.text(ctx, Draw.formatDurationShort(dur),
+                          x: barX + barW - 30, y: by,
+                          font: Fonts.system(fontSize - 1, weight: chronic ? .bold : .regular),
+                          color: chronic ? Color.red : Color.orange)
+            }
         }
 
         // Airflow temperature + Load average at panel bottom

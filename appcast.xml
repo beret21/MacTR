@@ -7,6 +7,35 @@
         <language>en</language>
 
         <item>
+            <title>MacTR 1.3.13</title>
+            <sparkle:version>1.3.13</sparkle:version>
+            <sparkle:shortVersionString>1.3.13</sparkle:shortVersionString>
+            <description><![CDATA[
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #333; padding: 8px; }
+                    h3 { font-size: 14px; margin: 8px 0 4px; }
+                    ul { padding-left: 20px; margin: 4px 0; }
+                    li { margin: 2px 0; }
+                </style>
+                <h3>v1.3.13 — chronic load detection</h3>
+                <ul>
+                    <li><b>CPU severity now comes from the distribution, not the average.</b> Two pegged cores out of ten only move the mean by 20 points, so a chronic stall used to show green. Severity now uses the busiest core, how many are saturated, and how long it has lasted.</li>
+                    <li><b>Per-core duration on screen</b> — a core at 80% now shows whether that is 8 seconds or 8 days.</li>
+                    <li><b>Efficiency cores are no longer excluded from the alert colors.</b> They were drawn in a fixed cyan, so saturated E-cores looked calm.</li>
+                    <li><b>Watchlist + notifications</b> for sustained load, including macOS' own cpu_resource filings. Alerts always state the elapsed duration, are batched, escalate 1h → 1d → 1w, and a dismissed item comes back if it is still going.</li>
+                    <li><b>History log</b> at ~/Library/Logs/MacTR with tiered retention. Query with <code>--dump-log --sustained</code>. Reclaimed files go to the Trash, never deleted outright.</li>
+                    <li>Fixed os_log using the info level, which macOS keeps in memory only — that is why log queries came back empty.</li>
+                </ul>
+            ]]></description>
+            <pubDate>Sun, 02 Aug 2026 12:00:00 +0900</pubDate>
+            <enclosure
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.13/MacTR-1.3.13.zip"
+                sparkle:edSignature="O7XWMSpYCNi/JKVWd9XapL+IQ7UYA17jq89P3sNGBBBb7n3gJy7RJdOuh514DCBja9frjl0WVSIdzr869PacCQ=="
+                length="1793056"
+                type="application/octet-stream" />
+        </item>
+
+        <item>
             <title>MacTR 1.3.12</title>
             <sparkle:version>1.3.12</sparkle:version>
             <sparkle:shortVersionString>1.3.12</sparkle:shortVersionString>

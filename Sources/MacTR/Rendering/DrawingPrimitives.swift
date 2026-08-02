@@ -245,6 +245,24 @@ enum Draw {
              font: Fonts.system(15), color: bottomColor)
     }
 
+    /// Compact duration for the tight per-core rows: 8d, 3h, 45m, 30s.
+    static func formatDurationShort(_ t: TimeInterval) -> String {
+        if t >= 86400 { return String(format: "%.0fd", t / 86400) }
+        if t >= 3600 { return String(format: "%.0fh", t / 3600) }
+        if t >= 60 { return String(format: "%.0fm", t / 60) }
+        return String(format: "%.0fs", max(t, 0))
+    }
+
+    /// Human-readable duration for notifications and log summaries: "8d 3h", "45m".
+    static func formatDurationLong(_ t: TimeInterval) -> String {
+        let s = Int(max(t, 0))
+        let d = s / 86400, h = (s % 86400) / 3600, m = (s % 3600) / 60
+        if d > 0 { return h > 0 ? "\(d)일 \(h)시간" : "\(d)일" }
+        if h > 0 { return m > 0 ? "\(h)시간 \(m)분" : "\(h)시간" }
+        if m > 0 { return "\(m)분" }
+        return "\(s)초"
+    }
+
     /// Format bytes per second to human-readable string
     static func formatBytesPerSec(_ bps: Double) -> String {
         if bps >= 1_000_000_000 { return String(format: "%.1f GB/s", bps / 1e9) }

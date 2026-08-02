@@ -13,7 +13,11 @@ import SwiftUI
 private let mactrLogger = Logger(subsystem: "com.beret21.MacTR", category: "main")
 
 func log(_ message: String) {
-    mactrLogger.info("\(message, privacy: .public)")
+    // `.notice`, not `.info`. Unified logging keeps info-level messages in memory only,
+    // so they are gone by the time anyone runs `log show` — which is why a 24-hour
+    // query returned zero entries despite os_log being "adopted" in v1.3.6 (§4.4).
+    // notice and above are persisted to disk.
+    mactrLogger.notice("\(message, privacy: .public)")
 }
 
 // MARK: - App Entry Point
@@ -24,6 +28,36 @@ struct MacTREntry {
         // CLI mode
         if CommandLine.arguments.contains("--cli") {
             runCLI()
+            return
+        }
+
+        // Headless monitor mode — runs metrics + watchlist + logging without USB
+        // hardware. Exists so the persistence/watchlist behaviour in §5.3/§5.5 can be
+        // exercised for real instead of being eyeballed in the source.
+        // Usage: --monitor [seconds]
+        if CommandLine.arguments.contains("--monitor") {
+            let secs = Double(parseFlag(CommandLine.arguments, flag: "--monitor") ?? 60)
+            let renderer = MonitorRenderer()
+            renderer.startMetrics()
+            let deadline = Date().addingTimeInterval(secs)
+            while Date() < deadline {
+                Thread.sleep(forTimeInterval: 5)
+                let items = Watchlist.shared.all.sorted { $0.duration() > $1.duration() }
+                let cores = items.filter { $0.kind == .core }
+                let line = cores.map {
+                    "\($0.id)=\($0.detail)/\(Draw.formatDurationShort($0.duration()))[\($0.state.rawValue)]"
+                }.joined(separator: " ")
+                print("[\(Draw.formatDurationShort(secs - deadline.timeIntervalSinceNow))] \(line)")
+                fflush(stdout)
+            }
+            MetricsLogger.shared.markGracefulShutdown()
+            return
+        }
+
+        // Log query mode (§4.4) — reads the JSONL history directly, no IPC needed.
+        // Usage: --dump-log [--last 24h] [--session current|prev|<name>] [--sustained]
+        if CommandLine.arguments.contains("--dump-log") {
+            LogQuery.run(args: CommandLine.arguments)
             return
         }
 
@@ -88,6 +122,7 @@ final class StatusBarController: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         log("[*] MacTR starting...")
+        AlertManager.shared.requestAuthorization()
 
         // Create status bar item — this NEVER gets removed
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -122,6 +157,9 @@ final class StatusBarController: NSObject, NSApplicationDelegate, NSMenuDelegate
     func applicationWillTerminate(_ notification: Notification) {
         updateTimer?.invalidate()
         appState.stop()
+        // Write the graceful marker. Its absence is how retention identifies a
+        // crash/forced-reboot session and pins it at full resolution (§4.5 rule 3).
+        MetricsLogger.shared.markGracefulShutdown()
     }
 
     // MARK: - NSMenuDelegate
@@ -264,6 +302,45 @@ final class StatusBarController: NSObject, NSApplicationDelegate, NSMenuDelegate
 
         // Reconnect visibility
         reconnectItem.isHidden = appState.isConnected
+
+        updateWatchlistMenu()
+    }
+
+    /// Confirmed watchlist entries, with the elapsed time in the title and a dismiss
+    /// action. Dismissal must be reachable — but it only suppresses for a day, after
+    /// which an unresolved condition comes back (§4.7).
+    private func updateWatchlistMenu() {
+        guard let menu = statusItem.menu else { return }
+        // Drop the previous block.
+        for item in menu.items where item.representedObject is WatchMenuTag {
+            menu.removeItem(item)
+        }
+        let confirmed = Watchlist.shared.confirmed
+            .sorted { $0.duration() > $1.duration() }
+        guard !confirmed.isEmpty else { return }
+
+        var insertAt = 1
+        let header = NSMenuItem(title: "⚠️ 지속 부하 \(confirmed.count)건", action: nil, keyEquivalent: "")
+        header.representedObject = WatchMenuTag()
+        header.isEnabled = false
+        menu.insertItem(header, at: insertAt); insertAt += 1
+
+        for item in confirmed.prefix(6) {
+            let mi = NSMenuItem(
+                title: "   \(item.id) \(item.detail) — \(Draw.formatDurationLong(item.duration()))째",
+                action: #selector(dismissWatchItem(_:)), keyEquivalent: "")
+            mi.target = self
+            mi.representedObject = WatchMenuTag(item: item)
+            menu.insertItem(mi, at: insertAt); insertAt += 1
+        }
+        let sep = NSMenuItem.separator()
+        sep.representedObject = WatchMenuTag()
+        menu.insertItem(sep, at: insertAt)
+    }
+
+    @objc private func dismissWatchItem(_ sender: NSMenuItem) {
+        guard let tag = sender.representedObject as? WatchMenuTag, let item = tag.item else { return }
+        AlertManager.shared.dismiss(item)
     }
 
     // MARK: - Actions
@@ -460,4 +537,10 @@ func makeTestJPEG(width: Int, height: Int) -> Data? {
 
     guard let image = ctx.makeImage() else { return nil }
     return JPEGEncoder.encode(image)
+}
+
+/// Marks menu items owned by the watchlist block so they can be rebuilt in place.
+final class WatchMenuTag: NSObject {
+    let item: WatchItem?
+    init(item: WatchItem? = nil) { self.item = item }
 }

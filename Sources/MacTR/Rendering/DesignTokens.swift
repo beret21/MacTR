@@ -45,6 +45,23 @@ enum Color {
         pct < 50 ? greenD : (pct < 75 ? orangeD : redD)
     }
 
+    /// Color by CPU severity (distribution-based, not the arithmetic mean — §2-B).
+    static func forSeverity(_ s: CPUSeverity) -> CGColor {
+        switch s {
+        case .normal: return green
+        case .warning: return orange
+        case .critical: return red
+        }
+    }
+
+    static func forSeverityDark(_ s: CPUSeverity) -> CGColor {
+        switch s {
+        case .normal: return greenD
+        case .warning: return orangeD
+        case .critical: return redD
+        }
+    }
+
     /// Color by macOS memory pressure level (1=normal, 2=warn, 4=critical).
     /// Severity comes from pressure, not from used% — a Mac using RAM as cache is not "in danger".
     static func forPressure(_ level: Int) -> CGColor {

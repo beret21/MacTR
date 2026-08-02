@@ -11,11 +11,68 @@ import IOKit.ps
 
 // MARK: - Data Structures
 
+/// CPU load severity. Derived from the DISTRIBUTION of per-core load, never from
+/// the arithmetic mean — 2 saturated cores out of 10 move the mean by at most 20pp,
+/// so a mean-based threshold structurally cannot detect core saturation (§2-B).
+enum CPUSeverity: Int, Sendable, Comparable {
+    case normal = 0
+    case warning = 1
+    case critical = 2
+    static func < (a: CPUSeverity, b: CPUSeverity) -> Bool { a.rawValue < b.rawValue }
+}
+
+enum CPUThresholds {
+    /// A core at or above this is "saturated".
+    static let saturated: Double = 80
+    /// Hysteresis release point — must fall below this to clear (prevents flapping at 80).
+    static let release: Double = 70
+    /// Saturation lasting at least this long is chronic, not a benign spike.
+    /// Overridable via `MACTR_CHRONIC_SECONDS` so promotion/alerting can be verified
+    /// in seconds rather than by waiting an hour (§5.6).
+    static let chronic: TimeInterval = {
+        if let s = ProcessInfo.processInfo.environment["MACTR_CHRONIC_SECONDS"],
+           let v = TimeInterval(s) { return v }
+        return 3600  // 1 hour
+    }()
+}
+
 struct CPUSnapshot: Sendable {
-    let perCore: [Double]  // percentage per core
-    let total: Double      // average percentage
+    let perCore: [Double]  // percentage per core — index 0..<eCoreCount are E-cores
+    let total: Double      // arithmetic mean — GAUGE ONLY, never for severity (§2-B)
     let loadAvg: (Double, Double, Double)
     let pCoreCount: Int    // performance cores (rest are efficiency)
+
+    // §4.2 — distribution, so saturation cannot hide behind the mean
+    let maxCore: Double        // busiest single core
+    let saturatedCount: Int    // cores >= CPUThresholds.saturated
+    let pCoreAvg: Double
+    let eCoreAvg: Double
+
+    // §4.3 — per-core high-load start times (absent = not in high-load state)
+    let coreHighLoadSince: [Int: Date]
+
+    var eCoreCount: Int { max(perCore.count - pCoreCount, 0) }
+
+    /// How long core `i` has been continuously in high-load state.
+    func highLoadDuration(_ i: Int, now: Date = Date()) -> TimeInterval? {
+        guard let since = coreHighLoadSince[i] else { return nil }
+        return now.timeIntervalSince(since)
+    }
+
+    /// Longest running saturation across all cores — the "is this chronic?" signal.
+    func longestHighLoad(now: Date = Date()) -> TimeInterval {
+        coreHighLoadSince.values.map { now.timeIntervalSince($0) }.max() ?? 0
+    }
+
+    /// Severity from distribution + persistence (§2-B). The mean plays no part.
+    func severity(now: Date = Date()) -> CPUSeverity {
+        guard !perCore.isEmpty else { return .normal }
+        // Widespread saturation is critical regardless of how long it has run.
+        if saturatedCount >= max(perCore.count / 2, 1) { return .critical }
+        guard saturatedCount >= 1 else { return .normal }
+        // A single saturated core: benign spike vs chronic load is decided by duration.
+        return longestHighLoad(now: now) >= CPUThresholds.chronic ? .critical : .warning
+    }
 }
 
 struct MemorySnapshot: Sendable {
@@ -99,6 +156,9 @@ final class SystemMetricsCollector: @unchecked Sendable {
     private var prevSwapOuts: UInt64 = 0
     private var prevSwapTime: Date?
 
+    // §4.3 — per-core saturation start times, carried across samples
+    private var coreHighLoadSince: [Int: Date] = [:]
+
     // SMC connection for temperature
     private var smcConn: io_connect_t = 0
     private var smcOpened = false
@@ -117,7 +177,9 @@ final class SystemMetricsCollector: @unchecked Sendable {
             &numCPU, &cpuInfo, &numCPUInfo)
 
         guard result == KERN_SUCCESS, let info = cpuInfo else {
-            return CPUSnapshot(perCore: [], total: 0, loadAvg: (0, 0, 0), pCoreCount: 0)
+            return CPUSnapshot(perCore: [], total: 0, loadAvg: (0, 0, 0), pCoreCount: 0,
+                               maxCore: 0, saturatedCount: 0, pCoreAvg: 0, eCoreAvg: 0,
+                               coreHighLoadSince: [:])
         }
 
         defer {
@@ -165,10 +227,36 @@ final class SystemMetricsCollector: @unchecked Sendable {
         // If sysctl fails (Intel), assume all cores are P-cores
         let pCount = pCores > 0 ? Int(pCores) : perCore.count
 
+        // §4.3 — track how long each core has been saturated. Hysteresis: enter at
+        // `saturated`, clear only below `release`, so a core hovering at the threshold
+        // doesn't reset its timer every tick and lose the chronic signal.
+        // Counters only, no subprocess — safe for the metrics hot path.
+        let now = Date()
+        for (i, pct) in perCore.enumerated() {
+            if pct >= CPUThresholds.saturated {
+                if coreHighLoadSince[i] == nil { coreHighLoadSince[i] = now }
+            } else if pct < CPUThresholds.release {
+                coreHighLoadSince[i] = nil
+            }
+        }
+        // Drop entries for cores that no longer exist (core count can change).
+        coreHighLoadSince = coreHighLoadSince.filter { $0.key < perCore.count }
+
+        // §4.2 — distribution. E-cores occupy indices 0..<eCount (see MonitorRenderer).
+        let eCount = max(perCore.count - pCount, 0)
+        let eSlice = perCore.prefix(eCount)
+        let pSlice = perCore.dropFirst(eCount)
+        let eAvg = eSlice.isEmpty ? 0 : eSlice.reduce(0, +) / Double(eSlice.count)
+        let pAvg = pSlice.isEmpty ? 0 : pSlice.reduce(0, +) / Double(pSlice.count)
+
         return CPUSnapshot(
             perCore: perCore, total: total,
             loadAvg: (loadavg[0], loadavg[1], loadavg[2]),
-            pCoreCount: pCount)
+            pCoreCount: pCount,
+            maxCore: perCore.max() ?? 0,
+            saturatedCount: perCore.filter { $0 >= CPUThresholds.saturated }.count,
+            pCoreAvg: pAvg, eCoreAvg: eAvg,
+            coreHighLoadSince: coreHighLoadSince)
     }
 
     // MARK: - Memory
