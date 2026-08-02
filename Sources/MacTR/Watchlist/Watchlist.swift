@@ -81,9 +81,10 @@ final class Watchlist: @unchecked Sendable {
     /// which already applies 80%-enter / 70%-release hysteresis so an item does not
     /// flap on and off while a core hovers at the boundary.
     func observe(cpu: CPUSnapshot, now: Date = Date()) {
-        let eCount = cpu.eCoreCount
         for i in 0..<cpu.perCore.count {
-            let label = i < eCount ? "E\(i + 1)" : "P\(i - eCount + 1)"
+            // Same labels the display uses, sourced from the device tree so an alert
+            // can never name a different core than the screen shows.
+            let label = CoreTopology.label(forIndex: i)
             if let since = cpu.coreHighLoadSince[i] {
                 upsert(kind: .core, id: label, value: cpu.perCore[i], since: since,
                        detail: String(format: "%.0f%%", cpu.perCore[i]), now: now)

@@ -292,29 +292,19 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         let pCoreCount = cpu.pCoreCount
         let eCoreCount = coreCount - pCoreCount
 
-        // Core index order: host_processor_info() returns E-cores FIRST
-        // (indices 0..<eCoreCount), then P-cores. `hw.perflevelN.logicalcpu` gives
-        // core COUNTS only — it does NOT tell you the array order, and assuming
-        // P-cores came first mislabeled every row from v1.1.0 to v1.3.11.
-        //
-        // Verified on this machine (M1 Max / macOS 26) with a two-way test:
-        //   taskpolicy -b <spinner>  → only indices 0,1 saturate   (background QoS ⇒ E-cores)
-        //   4× normal-QoS spinners   → indices 2-9 rise, 0-1 fall  (⇒ P-cores)
-        // See LESSONS_LEARNED.md #13 for the procedure.
-        //
-        // UNVERIFIED on other Apple Silicon variants (M2/M3/M4, different core
-        // configs). If a chip ever returns P-cores first, labels flip — re-run the
-        // taskpolicy test above before trusting this on new hardware.
-        //
-        // Rows are drawn E first then P, which matches the array order, so the row
-        // number IS the core index.
-        for row in 0..<coreCount {
+        // Which array index is which core comes from CoreTopology, which reads
+        // cluster-type out of the IODeviceTree. Nothing here assumes a layout, so
+        // this renders correctly on any Apple Silicon part regardless of how its
+        // clusters are ordered. Display order (E rows first) stays a presentation
+        // choice and is kept separate from where the cores actually live.
+        let rows = CoreTopology.displayRows()
+        for (row, entry) in rows.enumerated() {
             let by = startY + row * spacing
             if by + Int(fontSize) > bottomLimit { break }
 
-            let coreIndex = row
-            let isECore = row < eCoreCount
-            let label = isECore ? "E\(row + 1)" : "P\(row - eCoreCount + 1)"
+            let coreIndex = entry.index
+            let isECore = entry.isEfficiency
+            let label = entry.label
 
             let pct = coreIndex < cpu.perCore.count ? cpu.perCore[coreIndex] : 0
 

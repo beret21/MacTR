@@ -242,12 +242,13 @@ final class SystemMetricsCollector: @unchecked Sendable {
         // Drop entries for cores that no longer exist (core count can change).
         coreHighLoadSince = coreHighLoadSince.filter { $0.key < perCore.count }
 
-        // §4.2 — distribution. E-cores occupy indices 0..<eCount (see MonitorRenderer).
-        let eCount = max(perCore.count - pCount, 0)
-        let eSlice = perCore.prefix(eCount)
-        let pSlice = perCore.dropFirst(eCount)
-        let eAvg = eSlice.isEmpty ? 0 : eSlice.reduce(0, +) / Double(eSlice.count)
-        let pAvg = pSlice.isEmpty ? 0 : pSlice.reduce(0, +) / Double(pSlice.count)
+        // §4.2 — distribution. Which indices are E vs P comes from the device tree
+        // (CoreTopology), not from position, so these averages stay correct on any
+        // core layout rather than only where efficiency cores happen to come first.
+        let eIdx = CoreTopology.eCoreIndices.filter { $0 < perCore.count }
+        let pIdx = CoreTopology.pCoreIndices.filter { $0 < perCore.count }
+        let eAvg = eIdx.isEmpty ? 0 : eIdx.reduce(0.0) { $0 + perCore[$1] } / Double(eIdx.count)
+        let pAvg = pIdx.isEmpty ? 0 : pIdx.reduce(0.0) { $0 + perCore[$1] } / Double(pIdx.count)
 
         return CPUSnapshot(
             perCore: perCore, total: total,
