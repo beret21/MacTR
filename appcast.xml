@@ -7,6 +7,34 @@
         <language>en</language>
 
         <item>
+            <title>MacTR 1.3.15</title>
+            <sparkle:version>1.3.15</sparkle:version>
+            <sparkle:shortVersionString>1.3.15</sparkle:shortVersionString>
+            <description><![CDATA[
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #333; padding: 8px; }
+                    h3 { font-size: 14px; margin: 8px 0 4px; }
+                    ul { padding-left: 20px; margin: 4px 0; }
+                    li { margin: 2px 0; }
+                </style>
+                <h3>v1.3.15 — adaptive process scanning</h3>
+                <ul>
+                    <li><b>MacTR no longer polls harder than it needs to.</b> Walking every process is the only expensive thing it does on a timer (~7ms for ~850 processes); it used to run every 2 seconds regardless of whether anything was happening.</li>
+                    <li><b>The pace now follows the load.</b> Idle: every 60s. A core saturates: 2s, immediately, so the responsible process can be named. Once it clears the interval relaxes 2 → 5 → 15 → 60s. Roughly 5× fewer scans while idle.</li>
+                    <li><b>New setting (General → 감시 강도)</b>: 절전 (120s fixed) / 표준 (adaptive, default) / 정밀 (2s fixed).</li>
+                    <li>Opening the menu bar menu briefly tightens the scan — you are looking, so the numbers should be current.</li>
+                </ul>
+                <p>Core, memory and temperature readings are unaffected and still refresh every 0.5s: each is a single syscall and costs nothing worth pacing.</p>
+            ]]></description>
+            <pubDate>Sun, 02 Aug 2026 23:00:00 +0900</pubDate>
+            <enclosure
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.15/MacTR-1.3.15.zip"
+                sparkle:edSignature="4dqgTWwXQM9UpXlN1OZ8zd40FFyOsPhc2og6d5XVaQV7+XuPsnSCuG0pd1pMcBjSCcT8Cz6UyAshnwFQ18x/Bw=="
+                length="1804481"
+                type="application/octet-stream" />
+        </item>
+
+        <item>
             <title>MacTR 1.3.14</title>
             <sparkle:version>1.3.14</sparkle:version>
             <sparkle:shortVersionString>1.3.14</sparkle:shortVersionString>

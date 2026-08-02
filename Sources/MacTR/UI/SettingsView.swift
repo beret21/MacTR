@@ -8,6 +8,7 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var state: AppState
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var scanIntensity = ScanScheduler.shared.intensity
 
     var body: some View {
         TabView {
@@ -40,6 +41,28 @@ struct SettingsView: View {
                         setLaunchAtLogin(newValue)
                     }
                 Text("Requires .app bundle to work (not available in debug builds)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("감시 강도") {
+                Picker("프로세스 스캔", selection: $scanIntensity) {
+                    ForEach(ScanIntensity.allCases, id: \.self) { level in
+                        Text(level.label).tag(level)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: scanIntensity) { _, newValue in
+                    ScanScheduler.shared.intensity = newValue
+                }
+                Text(scanIntensity.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                // Why this control exists: the process walk is the only expensive thing
+                // MacTR does on a timer (~7ms for ~850 processes). Everything else is a
+                // single syscall and is not worth pacing.
+                Text("전체 프로세스를 훑는 작업만 조절합니다. 코어·메모리 등 나머지 지표는 "
+                     + "비용이 거의 없어 항상 0.5초로 갱신됩니다.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

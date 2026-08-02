@@ -167,6 +167,9 @@ final class StatusBarController: NSObject, NSApplicationDelegate, NSMenuDelegate
     func menuNeedsUpdate(_ menu: NSMenu) {
         updateIcon()
         updateMenuItems()
+        // The user is looking right now — that is the one moment the numbers under
+        // their eyes should be current, so tighten the scan briefly.
+        ScanScheduler.shared.noteUserAttention()
     }
 
     // MARK: - Icon

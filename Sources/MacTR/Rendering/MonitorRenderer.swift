@@ -118,8 +118,14 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
                 lock.lock()
                 _gpu = gpu; _disk = disk; _net = net; _diskIO = diskIO; _temp = temp
                 lock.unlock()
-                Watchlist.shared.observeProcesses()
                 slowTick = 0
+            }
+
+            // The full process walk is the only expensive periodic operation here
+            // (~7ms for ~850 processes), so it is paced rather than run flat out.
+            // The gate itself is free: saturation comes from the per-core sample above.
+            if ScanScheduler.shared.shouldScan(saturated: cpu.saturatedCount > 0) {
+                Watchlist.shared.observeProcesses()
             }
 
             // macOS' own CPU-limit filings — cheap directory listing, checked every
