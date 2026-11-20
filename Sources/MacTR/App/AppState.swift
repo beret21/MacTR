@@ -34,8 +34,20 @@ final class AppState {
     // Display
     var currentSet: DisplaySet = .systemMonitor
     var brightness: Int = 5
-    var refreshInterval: Double = 0.5
+    var refreshInterval: Double = AppState.savedRefreshInterval()
     var rotateDisplay: Bool = false
+
+    /// Render interval ("Refresh"), persisted across launches. Default 1.0s (was 0.5s) —
+    /// the clock is 1s-resolution. Only rendering/encoding follows this; USB frames are
+    /// still sent every 0.5s (cached JPEG re-sent) so the LCD never blanks.
+    nonisolated static let refreshIntervalKey = "refreshInterval"
+    nonisolated static let refreshIntervalChoices: [Double] = [0.5, 1.0, 2.0]
+    nonisolated static let defaultRefreshInterval: Double = 1.0
+
+    nonisolated static func savedRefreshInterval() -> Double {
+        let v = UserDefaults.standard.double(forKey: refreshIntervalKey)  // 0 when unset
+        return refreshIntervalChoices.contains(v) ? v : defaultRefreshInterval
+    }
 
     // Metrics (for menu bar display)
     var frameCount = 0
@@ -89,6 +101,7 @@ final class AppState {
 
     /// Called when user changes display set, brightness, or interval
     func applySettings() {
+        UserDefaults.standard.set(refreshInterval, forKey: AppState.refreshIntervalKey)
         engine?.updateSettings(set: currentSet, brightness: brightness, interval: refreshInterval, rotate: rotateDisplay)
     }
 }
@@ -118,7 +131,7 @@ final class DisplayEngine: @unchecked Sendable {
     // Settings (atomically accessed)
     private var currentSet: DisplaySet = .systemMonitor
     private var brightness: Int = 5
-    private var interval: Double = 0.5
+    private var interval: Double = AppState.defaultRefreshInterval
     private var rotateDisplay: Bool = false
 
     // Renderers
@@ -209,15 +222,27 @@ final class DisplayEngine: @unchecked Sendable {
         }
     }
 
+    /// USB keep-alive period. The LCD blanks within seconds without frames, so the
+    /// SEND cadence stays fixed at 0.5s regardless of the user's refresh setting.
+    private static let sendInterval: TimeInterval = 0.5
+
     private func runFrameLoop(device: USBDevice, info: DeviceInfo) {
         running = true
         // Metrics already collecting in background via startMetrics()
 
+        // Render cadence (user "Refresh" setting) is decoupled from send cadence:
+        // render + JPEG-encode only every `interval`, and re-send the cached JPEG on
+        // every 0.5s tick in between. Cuts CG/JPEG work without risking a blank LCD.
+        var cachedJPEG: Data?
+        var lastRender = DispatchTime(uptimeNanoseconds: 0)
+        var lastSettings: (DisplaySet, Int, Bool)?
+
         var nextDeadline = DispatchTime.now()
+        let sendNanos = UInt64(Self.sendInterval * 1_000_000_000)
 
         while running {
             // Schedule next frame deadline BEFORE work starts
-            nextDeadline = nextDeadline + .milliseconds(Int(interval * 1000))
+            nextDeadline = nextDeadline + .nanoseconds(Int(sendNanos))
 
             // autoreleasepool forces CG raster data / CGImage release each frame
             // Without this, Core Graphics caches hundreds of 3.6MB images → GB leak
@@ -225,25 +250,37 @@ final class DisplayEngine: @unchecked Sendable {
                 let set = currentSet
                 let bright = brightness
                 let rotate = rotateDisplay
+                let renderNanos = UInt64(max(interval, Self.sendInterval) * 1_000_000_000)
 
-                let jpeg: Data?
-
-                switch set {
-                case .systemMonitor:
-                    if let image = monitorRenderer.render() {
-                        jpeg = JPEGEncoder.encode(image, brightness: bright, rotate: rotate)
-                    } else {
-                        jpeg = nil
+                // Re-render when the interval elapsed, nothing is cached yet, or a
+                // visual setting changed (so brightness/rotate apply immediately).
+                let now = DispatchTime.now()
+                let settingsChanged = lastSettings.map { $0 != (set, bright, rotate) } ?? true
+                let due = now.uptimeNanoseconds &- lastRender.uptimeNanoseconds >= renderNanos
+                if cachedJPEG == nil || settingsChanged || due {
+                    let fresh: Data?
+                    switch set {
+                    case .systemMonitor:
+                        if let image = monitorRenderer.render() {
+                            fresh = JPEGEncoder.encode(image, brightness: bright, rotate: rotate)
+                        } else {
+                            fresh = nil
+                        }
+                    }
+                    if let fresh {
+                        cachedJPEG = fresh
+                        lastRender = now
+                        lastSettings = (set, bright, rotate)
                     }
                 }
 
-                if let jpeg {
+                if let jpeg = cachedJPEG {
                     do {
                         try LYProtocol.sendFrame(device: device, jpegData: jpeg)
                         frameCount += 1
                         lastFrameSize = jpeg.count
                         if frameCount == 1 {
-                            log("[OK] Active! ~\(jpeg.count / 1024)KB/frame")
+                            log("[OK] Active! ~\(jpeg.count / 1024)KB/frame, render every \(max(interval, Self.sendInterval))s, send every \(Self.sendInterval)s")
                         }
                         postStatus(connected: true, deviceInfo: nil,
                                    message: "Active")

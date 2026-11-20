@@ -69,8 +69,8 @@ struct SettingsView: View {
 
             Section("Refresh") {
                 Picker("Interval", selection: $state.refreshInterval) {
-                    Text("0.5s (default)").tag(0.5)
-                    Text("1.0s").tag(1.0)
+                    Text("0.5s").tag(0.5)
+                    Text("1.0s (default)").tag(1.0)
                     Text("2.0s").tag(2.0)
                 }
                 .onChange(of: state.refreshInterval) {

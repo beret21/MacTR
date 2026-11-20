@@ -177,7 +177,9 @@ Questions, bugs, or feature requests? [Open an issue](https://github.com/beret21
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
+
+The LY protocol was implemented independently, based on the protocol reverse-engineered by [thermalright-trcc-linux](https://github.com/Lexonight1/thermalright-trcc-linux) (GPL-3.0). No code from that project is included here. The project is credited out of courtesy.
 
 ---
 

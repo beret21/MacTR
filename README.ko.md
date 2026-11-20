@@ -185,7 +185,9 @@ USB 통신은 [thermalright-trcc-linux](https://github.com/Lexonight1/thermalrig
 
 ## 라이선스
 
-MIT
+MIT. [LICENSE](LICENSE) 참고.
+
+LY 프로토콜은 [thermalright-trcc-linux](https://github.com/Lexonight1/thermalright-trcc-linux)(GPL-3.0)가 리버스 엔지니어링한 프로토콜 사양을 바탕으로 독자 구현했습니다. 이 저장소에는 그 프로젝트의 코드가 들어 있지 않으며, 출처는 예의로 밝혀 둡니다.
 
 ---
 
