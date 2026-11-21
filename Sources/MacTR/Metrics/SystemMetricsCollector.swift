@@ -132,6 +132,13 @@ struct BatterySnapshot: Sendable {
 struct SystemSnapshot: Sendable {
     let uptimeSeconds: Int
     let processCount: Int
+    /// MacTR's own CPU, in percent of ONE core (Activity Monitor convention).
+    var selfCPUPercent: Double = 0
+    /// MacTR's share of all CPU work currently done on the machine (0–100).
+    /// nil until the first measurement window closes or when the system is idle.
+    var selfShareOfLoad: Double? = nil
+    /// MacTR's physical memory footprint (same figure Activity Monitor shows).
+    var selfFootprintBytes: UInt64 = 0
 }
 
 // MARK: - Collector
@@ -140,6 +147,13 @@ final class SystemMetricsCollector: @unchecked Sendable {
 
     // Previous CPU ticks for delta calculation
     private var prevTicks: [(user: UInt64, system: UInt64, idle: UInt64, nice: UInt64)] = []
+
+    // Self-load measurement window (MacTR's own CPU vs. whole-machine busy time)
+    private var prevSelfCPUSeconds: Double = 0
+    private var prevSelfWall: Date?
+    private var prevHostTicks: (UInt32, UInt32, UInt32, UInt32) = (0, 0, 0, 0)
+    private var lastSelfCPU: Double = 0
+    private var lastSelfShare: Double?
 
     // Previous network bytes for delta calculation
     private var prevNetRx: UInt64 = 0
@@ -457,7 +471,82 @@ final class SystemMetricsCollector: @unchecked Sendable {
         sysctl(&mib, 3, nil, &procSize, nil, 0)
         let count = procSize / MemoryLayout<kinfo_proc>.size
 
-        return SystemSnapshot(uptimeSeconds: uptime, processCount: count)
+        let (selfCPU, share) = measureSelfLoad()
+        return SystemSnapshot(uptimeSeconds: uptime, processCount: count,
+                              selfCPUPercent: selfCPU, selfShareOfLoad: share,
+                              selfFootprintBytes: selfFootprint())
+    }
+
+    // MARK: - Self Load (MacTR's own cost)
+
+    /// Measures over a ~2s window so a single 0.5s tick (one render + JPEG encode)
+    /// does not make the figure jump. Both sides of the ratio are unit-free fractions,
+    /// so no tick-rate assumption is needed:
+    ///   self   = own CPU seconds / wall seconds             (cores used by MacTR)
+    ///   system = busy ticks / total ticks × logical cores   (cores used by everyone)
+    private func measureSelfLoad() -> (Double, Double?) {
+        let now = Date()
+        var ru = rusage()
+        getrusage(RUSAGE_SELF, &ru)
+        let cpuSec = Double(ru.ru_utime.tv_sec) + Double(ru.ru_utime.tv_usec) / 1e6
+                   + Double(ru.ru_stime.tv_sec) + Double(ru.ru_stime.tv_usec) / 1e6
+        let ticks = hostCPUTicks()
+
+        guard let prevWall = prevSelfWall, let ticks else {
+            prevSelfWall = now; prevSelfCPUSeconds = cpuSec
+            if let ticks { prevHostTicks = ticks }
+            return (0, nil)
+        }
+        let wall = now.timeIntervalSince(prevWall)
+        guard wall >= 2.0 else { return (lastSelfCPU, lastSelfShare) }
+
+        let selfCores = max(0, cpuSec - prevSelfCPUSeconds) / wall
+        lastSelfCPU = selfCores * 100
+
+        // natural_t counters wrap (~49 days of aggregate ticks on 10 cores);
+        // wrapping subtraction per field keeps the delta correct across a wrap.
+        let dUser = Double(ticks.0 &- prevHostTicks.0), dSys = Double(ticks.1 &- prevHostTicks.1)
+        let dIdle = Double(ticks.2 &- prevHostTicks.2), dNice = Double(ticks.3 &- prevHostTicks.3)
+        let dBusy = dUser + dSys + dNice
+        let dTotal = dBusy + dIdle
+        if dTotal > 0 {
+            let ncpu = Double(ProcessInfo.processInfo.activeProcessorCount)
+            let systemCores = dBusy / dTotal * ncpu
+            lastSelfShare = systemCores > 0.01 ? min(100, selfCores / systemCores * 100) : nil
+        } else {
+            lastSelfShare = nil
+        }
+
+        prevSelfWall = now; prevSelfCPUSeconds = cpuSec; prevHostTicks = ticks
+        return (lastSelfCPU, lastSelfShare)
+    }
+
+    /// Aggregate host CPU ticks summed over all cores: (user, system, idle, nice).
+    private func hostCPUTicks() -> (UInt32, UInt32, UInt32, UInt32)? {
+        var info = host_cpu_load_info_data_t()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<host_cpu_load_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let kr = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
+            }
+        }
+        guard kr == KERN_SUCCESS else { return nil }
+        // cpu_ticks index order: CPU_STATE_USER, CPU_STATE_SYSTEM, CPU_STATE_IDLE, CPU_STATE_NICE
+        return (info.cpu_ticks.0, info.cpu_ticks.1, info.cpu_ticks.2, info.cpu_ticks.3)
+    }
+
+    /// TASK_VM_INFO phys_footprint — the "Memory" column of Activity Monitor.
+    private func selfFootprint() -> UInt64 {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let kr = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return kr == KERN_SUCCESS ? info.phys_footprint : 0
     }
 
     // MARK: - Network Traffic (sysctl — no subprocess, 64-bit counters)

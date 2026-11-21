@@ -169,6 +169,16 @@ enum Draw {
         text(ctx, string, x: Int(x), y: y, font: font, color: color)
     }
 
+    /// Draw text whose right edge sits at `rightX`
+    static func rightText(
+        _ ctx: CGContext, _ string: String, rightX: Int, y: Int,
+        font: NSFont, color: CGColor
+    ) {
+        let attrs: [NSAttributedString.Key: Any] = [.font: font]
+        let width = (string as NSString).size(withAttributes: attrs).width
+        text(ctx, string, x: rightX - Int(width.rounded(.up)), y: y, font: font, color: color)
+    }
+
     // MARK: - Line
 
     static func line(

@@ -165,7 +165,9 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             swapInPerSec: 5_000_000, swapOutPerSec: 12_000_000,  // → red, visible snapshot
             swapAvailable: true, pressure: 1)
         let bat = BatterySnapshot(percent: 85, isCharging: false, isPresent: true)
-        let sys = SystemSnapshot(uptimeSeconds: 86400 + 7200 + 1800, processCount: 412)
+        let sys = SystemSnapshot(uptimeSeconds: 86400 + 7200 + 1800, processCount: 412,
+                                 selfCPUPercent: 1.8, selfShareOfLoad: 4,
+                                 selfFootprintBytes: 92 * 1_048_576)
         let disk = DiskSnapshot(totalGB: 1000, usedGB: 420, freeGB: 580)
         let net = NetworkSnapshot(rxBytesPerSec: 2_500_000, txBytesPerSec: 350_000)
         let diskIO = DiskIOSnapshot(readBytesPerSec: 15_000_000, writeBytesPerSec: 8_000_000)
@@ -645,8 +647,9 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
                   font: Fonts.system(20), color: Color.textL)
 
         // Divider
-        Draw.line(ctx, from: CGPoint(x: x + 16, y: Layout.height - (py + 192)),
-                  to: CGPoint(x: x + pw - 16, y: Layout.height - (py + 192)),
+        // Context is already flipped (top-left origin) — same as the GPU/Memory dividers.
+        Draw.line(ctx, from: CGPoint(x: x + 16, y: py + 192),
+                  to: CGPoint(x: x + pw - 16, y: py + 192),
                   color: Color.border)
 
         // System info
@@ -655,18 +658,19 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         let rw = pw - 40
 
         // Uptime
-        let hours = sys.uptimeSeconds / 3600
+        let days = sys.uptimeSeconds / 86400
+        let hours = (sys.uptimeSeconds % 86400) / 3600
         let mins = (sys.uptimeSeconds % 3600) / 60
         Draw.text(ctx, "Uptime", x: rx, y: ry,
                   font: Fonts.system(19), color: Color.textL)
-        Draw.text(ctx, "\(hours)h \(mins)m", x: rx + rw - 80, y: ry,
+        Draw.rightText(ctx, "\(days)d \(hours)h \(mins)m", rightX: rx + rw, y: ry,
                   font: Fonts.system(19), color: Color.textS)
         ry += 32
 
         // Processes
         Draw.text(ctx, "Processes", x: rx, y: ry,
                   font: Fonts.system(19), color: Color.textL)
-        Draw.text(ctx, "\(sys.processCount)", x: rx + rw - 55, y: ry,
+        Draw.rightText(ctx, "\(sys.processCount)", rightX: rx + rw, y: ry,
                   font: Fonts.system(19), color: Color.textS)
         ry += 32
 
@@ -675,8 +679,8 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         getloadavg(&loadavg, 3)
         Draw.text(ctx, "Load Avg", x: rx, y: ry,
                   font: Fonts.system(19), color: Color.textL)
-        Draw.text(ctx, String(format: "%.1f / %.1f / %.1f", loadavg[0], loadavg[1], loadavg[2]),
-                  x: rx + rw - 125, y: ry,
+        Draw.rightText(ctx, String(format: "%.1f / %.1f / %.1f", loadavg[0], loadavg[1], loadavg[2]),
+                  rightX: rx + rw, y: ry,
                   font: Fonts.system(19), color: Color.textS)
         ry += 32
 
@@ -686,11 +690,35 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             let status = "\(bat.percent)% \(bat.isCharging ? "Charging" : "Battery")"
             Draw.text(ctx, "Battery", x: rx, y: ry,
                       font: Fonts.system(19), color: Color.textL)
-            Draw.text(ctx, status, x: rx + rw - 130, y: ry,
+            Draw.rightText(ctx, status, rightX: rx + rw, y: ry,
                       font: Fonts.system(19), color: color)
             ry += 26
             Draw.bar(ctx, x: rx, y: ry, w: rw, h: 10,
                      percent: Double(bat.percent), color: color)
         }
+
+        // MacTR's own cost, pinned to the card bottom so the position does not
+        // depend on whether a battery row exists. Shown so a monitor that is
+        // itself part of the load can be seen as such rather than suspected.
+        let selfY = py + Layout.panelHeight - 76
+        Draw.line(ctx, from: CGPoint(x: x + 16, y: selfY - 8),
+                  to: CGPoint(x: x + pw - 16, y: selfY - 8),
+                  color: Color.border)
+        let selfFont = Fonts.system(17)
+        let cpuText: String = {
+            let own = String(format: "%.1f%%", sys.selfCPUPercent)
+            guard let share = sys.selfShareOfLoad else { return own }
+            return own + String(format: "  ·  %.0f%% of load", share)
+        }()
+        let cpuColor = sys.selfCPUPercent >= 10 ? Color.orange : Color.textS
+        Draw.text(ctx, "MacTR CPU", x: rx, y: selfY,
+                  font: selfFont, color: Color.textD)
+        Draw.rightText(ctx, cpuText, rightX: rx + rw, y: selfY,
+                       font: selfFont, color: cpuColor)
+        Draw.text(ctx, "MacTR Mem", x: rx, y: selfY + 30,
+                  font: selfFont, color: Color.textD)
+        Draw.rightText(ctx, String(format: "%.0f MB", Double(sys.selfFootprintBytes) / 1_048_576),
+                       rightX: rx + rw, y: selfY + 30,
+                       font: selfFont, color: Color.textS)
     }
 }
