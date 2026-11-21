@@ -543,10 +543,19 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             ("Available", availGB, Color.cyan),
         ]
         for (label, val, color) in items {
-            Draw.text(ctx, label, x: rx, y: ry,
-                      font: Fonts.system(19), color: Color.textL)
-            Draw.text(ctx, String(format: "%.1fG", val), x: rx + rw - 52, y: ry,
-                      font: Fonts.system(19), color: Color.textS)
+            // Value is right-aligned to the bar end; the label shrinks only when the
+            // pair would collide ("Compressed" + "27.8G" exceeds the column at 19 pt).
+            let valueText = val >= 100 ? String(format: "%.0fG", val) : String(format: "%.1fG", val)
+            let valueFont = Fonts.system(19)
+            let room = rw - Draw.textWidth(valueText, font: valueFont) - 8
+            var labelSize: CGFloat = 19
+            while labelSize > 14 && Draw.textWidth(label, font: Fonts.system(labelSize)) > room {
+                labelSize -= 1
+            }
+            Draw.text(ctx, label, x: rx, y: ry + Int(19 - labelSize),
+                      font: Fonts.system(labelSize), color: Color.textL)
+            Draw.rightText(ctx, valueText, rightX: rx + rw, y: ry,
+                           font: valueFont, color: Color.textS)
             Draw.bar(ctx, x: rx, y: ry + 24, w: rw, h: 10,
                      percent: val / totalGB * 100, color: color)
             ry += 48

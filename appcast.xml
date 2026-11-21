@@ -7,6 +7,32 @@
         <language>en</language>
 
         <item>
+            <title>MacTR 1.3.20</title>
+            <sparkle:version>1.3.20</sparkle:version>
+            <sparkle:shortVersionString>1.3.20</sparkle:shortVersionString>
+            <description><![CDATA[
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #333; padding: 8px; }
+                    h3 { font-size: 14px; margin: 8px 0 4px; }
+                    ul { padding-left: 20px; margin: 4px 0; }
+                    li { margin: 2px 0; }
+                </style>
+                <h3>v1.3.20 — memory panel fix</h3>
+                <ul>
+                    <li>Fixed the MEMORY breakdown where "Compressed" overlapped its value once it reached 10 GB or more. Values are now right-aligned, and a label shrinks only when it would collide.</li>
+                    <li>Values of 100 GB or more are shown without a decimal (e.g. 128G).</li>
+                </ul>
+            ]]></description>
+            <pubDate>Sat, 21 Nov 2026 13:45:00 +0900</pubDate>
+            <enclosure
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.20/MacTR-1.3.20.zip"
+                sparkle:edSignature="qm2ug6X4Fo/QOrH9xNGvzyriUXHnSVhUZHnI6S0iqrx29mQbyhUtqO7Qpdmwok9YXgpUkoYNL42/9I4floYXDA=="
+                length="1809911"
+                type="application/octet-stream"
+            />
+        </item>
+
+        <item>
             <title>MacTR 1.3.19</title>
             <sparkle:version>1.3.19</sparkle:version>
             <sparkle:shortVersionString>1.3.19</sparkle:shortVersionString>
