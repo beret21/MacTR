@@ -62,7 +62,7 @@ struct MacTREntry {
         }
 
         // Snapshot mode: render one frame and save as PNG
-        // Usage: --snapshot path.png [--cores N]
+        // Usage: --snapshot path.png [--cores N] [--rotated]  (--rotated = device orientation)
         if CommandLine.arguments.contains("--snapshot") {
             let renderer = MonitorRenderer()
             let simCores = parseFlag(CommandLine.arguments, flag: "--cores")
@@ -70,14 +70,14 @@ struct MacTREntry {
             // Prime metrics collection (required for real data render)
             renderer.startMetrics()
             Thread.sleep(forTimeInterval: 0.5)
-            for _ in 0..<30 { _ = renderer.render(); Thread.sleep(forTimeInterval: 0.1) }
+            for _ in 0..<30 { _ = renderer.render(rotate180: false); Thread.sleep(forTimeInterval: 0.1) }
 
             let image: CGImage?
             if let cores = simCores {
                 log("[Snapshot] Simulating \(cores) cores")
                 image = renderer.renderSimulated(coreCount: cores)
             } else {
-                image = renderer.render()
+                image = renderer.render(rotate180: CommandLine.arguments.contains("--rotated"))
             }
 
             if let image {
@@ -119,6 +119,10 @@ final class StatusBarController: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var versionMenuItem: NSMenuItem!
     private var reconnectItem: NSMenuItem!
     private var updateTimer: Timer?
+    /// Last icon state pushed to the status item. Assigning button.image makes AppKit
+    /// re-snapshot the item on every menu bar (measured ~39 ms/s at 1 Hz), so the
+    /// image is replaced only when the connection state actually changes.
+    private var iconShowsDisconnected: Bool?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         log("[*] MacTR starting...")
@@ -176,7 +180,12 @@ final class StatusBarController: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     private func updateIcon() {
         guard let button = statusItem.button else { return }
-        button.image = makeIcon(disconnected: !appState.isConnected)
+        let disconnected = !appState.isConnected
+        guard disconnected != iconShowsDisconnected else { return }
+        iconShowsDisconnected = disconnected
+        // labelColor inside the drawing handler re-resolves on appearance changes,
+        // so the cached image still follows light/dark mode.
+        button.image = makeIcon(disconnected: disconnected)
     }
 
     /// Draw menu bar icon manually. Connected = white display. Disconnected = display + red badge.
@@ -446,8 +455,8 @@ private func runCLI() {
 
         var count = 0
         while true {
-            guard let image = renderer.render(),
-                  let jpeg = JPEGEncoder.encode(image, brightness: brightness, rotate: rotate)
+            guard let image = renderer.render(rotate180: !rotate),
+                  let jpeg = JPEGEncoder.encode(image, brightness: brightness, rotate: true)
             else {
                 Thread.sleep(forTimeInterval: 1)
                 continue

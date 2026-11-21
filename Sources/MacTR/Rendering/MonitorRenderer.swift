@@ -29,6 +29,9 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
 
     // Reusable CGContext — avoids allocating 3.6MB every 0.5s (prevents CG raster data leak)
     private var reusableCtx: CGContext?
+    /// Pre-rendered background pixels per orientation. The full-frame gradient was
+    /// recomputed every frame (~7 ms); a memcpy of the cached pixels costs ~0.3 ms.
+    private var bgCache: [Bool: CGImage] = [:]
 
     // Ring buffers for sparklines (last 60 samples = 30 seconds)
     private let sparklineSize = 60
@@ -91,6 +94,8 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
     private func metricsLoop() {
         log("[Metrics] Loop started on metricsQueue")
         var slowTick = 0
+        var tempTick = 10    // first pass collects immediately
+        var diskTick = 120
         var diagTick = 600   // scan immediately on first pass — existing filings are evidence
         while metricsRunning {
             // Fast metrics every tick
@@ -111,14 +116,31 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
             slowTick += 1
             if slowTick >= 4 {
                 let gpu = collector.collectGPU()
-                let disk = collector.collectDisk()
                 let net = collector.collectNetwork()
                 let diskIO = collector.collectDiskIO()
-                let temp = collector.collectTemperature()
                 lock.lock()
-                _gpu = gpu; _disk = disk; _net = net; _diskIO = diskIO; _temp = temp
+                _gpu = gpu; _net = net; _diskIO = diskIO
                 lock.unlock()
                 slowTick = 0
+            }
+
+            // Temperature every ~5 s: each read is an IPC round trip per sensor into
+            // the HID event system, and airflow temperature moves slowly.
+            tempTick += 1
+            if tempTick >= 10 {
+                let temp = collector.collectTemperature()
+                lock.lock(); _temp = temp; lock.unlock()
+                tempTick = 0
+            }
+
+            // Free space every ~60 s: the important-usage capacity query goes through
+            // the CacheDelete daemon (and logs there) on every call, and free space
+            // changes slowly.
+            diskTick += 1
+            if diskTick >= 120 {
+                let disk = collector.collectDisk()
+                lock.lock(); _disk = disk; lock.unlock()
+                diskTick = 0
             }
 
             // The full process walk is the only expensive periodic operation here
@@ -202,7 +224,26 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         return ctx.makeImage()
     }
 
-    func render() -> CGImage? {
+    private func background(rotate180: Bool, w: Int, h: Int) -> CGImage {
+        if let cached = bgCache[rotate180] { return cached }
+        let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
+                            bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        if rotate180 {
+            ctx.translateBy(x: CGFloat(w), y: CGFloat(h))
+            ctx.scaleBy(x: -1, y: -1)
+        }
+        ctx.translateBy(x: 0, y: CGFloat(h))
+        ctx.scaleBy(x: 1, y: -1)
+        Draw.gradientBackground(ctx)
+        let image = ctx.makeImage()!
+        bgCache[rotate180] = image
+        return image
+    }
+
+    /// - Parameter rotate180: draw the frame turned 180° (device orientation), so the
+    ///   encoder does not need a second full-frame pass to rotate it.
+    func render(rotate180: Bool = false) -> CGImage? {
         // Read cached metrics (never blocks — uses latest available values)
         lock.lock()
         guard let cpu = _cpu, let mem = _mem, let gpu = _gpu,
@@ -235,13 +276,22 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         }
         guard let ctx = reusableCtx else { return nil }
 
-        // Reset transform and clear for new frame
+        // Background: an identity-transform .copy blit of cached pixels replaces the
+        // per-frame gradient. It is drawn before any transform so CG takes the plain
+        // copy path; the cached image already carries the orientation.
         ctx.saveGState()
+        ctx.setBlendMode(.copy)
+        ctx.draw(background(rotate180: rotate180, w: w, h: h),
+                 in: CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.restoreGState()
+
+        ctx.saveGState()
+        if rotate180 {
+            ctx.translateBy(x: CGFloat(w), y: CGFloat(h))
+            ctx.scaleBy(x: -1, y: -1)
+        }
         ctx.translateBy(x: 0, y: CGFloat(h))
         ctx.scaleBy(x: 1, y: -1)
-
-        // Background
-        Draw.gradientBackground(ctx)
 
         // Panels
         renderCPU(ctx, cpu: cpu, temp: temp)
@@ -700,25 +750,28 @@ final class MonitorRenderer: FrameRenderer, @unchecked Sendable {
         // MacTR's own cost, pinned to the card bottom so the position does not
         // depend on whether a battery row exists. Shown so a monitor that is
         // itself part of the load can be seen as such rather than suspected.
-        let selfY = py + Layout.panelHeight - 76
-        Draw.line(ctx, from: CGPoint(x: x + 16, y: selfY - 8),
-                  to: CGPoint(x: x + pw - 16, y: selfY - 8),
+        let rowH = 28
+        let memY = py + Layout.panelHeight - 38
+        let cpuY = memY - rowH
+        let headY = cpuY - rowH
+        Draw.line(ctx, from: CGPoint(x: x + 16, y: headY - 8),
+                  to: CGPoint(x: x + pw - 16, y: headY - 8),
                   color: Color.border)
         let selfFont = Fonts.system(17)
+        Draw.text(ctx, "MacTR Process Load", x: rx, y: headY,
+                  font: Fonts.system(17, weight: .medium), color: Color.textL)
         let cpuText: String = {
-            let own = String(format: "%.1f%%", sys.selfCPUPercent)
+            let own = String(format: "%.1f%% (Core)", sys.selfCPUPercent)
             guard let share = sys.selfShareOfLoad else { return own }
-            return own + String(format: "  ·  %.0f%% of load", share)
+            return own + String(format: " · %.1f%% (System)", share)
         }()
         let cpuColor = sys.selfCPUPercent >= 10 ? Color.orange : Color.textS
-        Draw.text(ctx, "MacTR CPU", x: rx, y: selfY,
-                  font: selfFont, color: Color.textD)
-        Draw.rightText(ctx, cpuText, rightX: rx + rw, y: selfY,
+        Draw.text(ctx, "CPU", x: rx, y: cpuY, font: selfFont, color: Color.textD)
+        Draw.rightText(ctx, cpuText, rightX: rx + rw, y: cpuY,
                        font: selfFont, color: cpuColor)
-        Draw.text(ctx, "MacTR Mem", x: rx, y: selfY + 30,
-                  font: selfFont, color: Color.textD)
+        Draw.text(ctx, "Mem", x: rx, y: memY, font: selfFont, color: Color.textD)
         Draw.rightText(ctx, String(format: "%.0f MB", Double(sys.selfFootprintBytes) / 1_048_576),
-                       rightX: rx + rw, y: selfY + 30,
+                       rightX: rx + rw, y: memY,
                        font: selfFont, color: Color.textS)
     }
 }

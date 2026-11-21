@@ -7,6 +7,35 @@
         <language>en</language>
 
         <item>
+            <title>MacTR 1.3.19</title>
+            <sparkle:version>1.3.19</sparkle:version>
+            <sparkle:shortVersionString>1.3.19</sparkle:shortVersionString>
+            <description><![CDATA[
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #333; padding: 8px; }
+                    h3 { font-size: 14px; margin: 8px 0 4px; }
+                    ul { padding-left: 20px; margin: 4px 0; }
+                    li { margin: 2px 0; }
+                </style>
+                <h3>v1.3.19 — about half the CPU</h3>
+                <ul>
+                    <li><b>MacTR itself now uses about half the CPU</b> (measured 7.3% → 3.5% of one core).</li>
+                    <li>The menu bar icon is redrawn only when the connection state changes, instead of every second.</li>
+                    <li>The background is drawn once and reused, and frames are drawn directly in panel orientation (no separate rotation pass).</li>
+                    <li>Disk free space is checked every minute and temperature every 5 seconds.</li>
+                    <li>The bottom of the SYSTEM panel is now titled "MacTR Process Load", showing CPU as % of one core and % of total system load.</li>
+                </ul>
+            ]]></description>
+            <pubDate>Sat, 21 Nov 2026 13:25:00 +0900</pubDate>
+            <enclosure
+                url="https://github.com/beret21/MacTR/releases/download/v1.3.19/MacTR-1.3.19.zip"
+                sparkle:edSignature="WdTh4a27QzH2H/TlS8KmWp8i/kBqn22j2eMnTC9owlLU6tpTo8qno2wBTFlzfQ8KKv6wu5ep2CAvB3nQwQZRDw=="
+                length="1809316"
+                type="application/octet-stream"
+            />
+        </item>
+
+        <item>
             <title>MacTR 1.3.18</title>
             <sparkle:version>1.3.18</sparkle:version>
             <sparkle:shortVersionString>1.3.18</sparkle:shortVersionString>

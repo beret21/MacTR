@@ -261,8 +261,10 @@ final class DisplayEngine: @unchecked Sendable {
                     let fresh: Data?
                     switch set {
                     case .systemMonitor:
-                        if let image = monitorRenderer.render() {
-                            fresh = JPEGEncoder.encode(image, brightness: bright, rotate: rotate)
+                        // The 180° turn is applied while drawing, so the encoder gets a
+                        // frame already in device orientation (no second full-frame copy).
+                        if let image = monitorRenderer.render(rotate180: !rotate) {
+                            fresh = JPEGEncoder.encode(image, brightness: bright, rotate: true)
                         } else {
                             fresh = nil
                         }

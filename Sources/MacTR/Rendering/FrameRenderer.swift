@@ -11,8 +11,9 @@ import ImageIO
 // MARK: - Protocol
 
 protocol FrameRenderer {
-    /// Render a full 1920x480 frame. Returns CGImage in device orientation.
-    func render() -> CGImage?
+    /// Render a full 1920x480 frame. With `rotate180` the frame is drawn turned
+    /// 180° so it can be sent without a separate rotation pass.
+    func render(rotate180: Bool) -> CGImage?
 }
 
 // MARK: - JPEG Encoding
